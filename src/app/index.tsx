@@ -16,6 +16,7 @@ import { getDaySummaries, getEntriesForDate } from '@/data/entriesRepo';
 import { gridRange, todayKey, type DateKey } from '@/domain/dates';
 import { HEALTH_LABELS, HEALTH_LEVELS, scoreDay } from '@/domain/health';
 import { useLiveData } from '@/hooks/useLiveData';
+import { categoryEmoji } from '@/lib/emoji';
 import { haptics } from '@/lib/haptics';
 import { colors, healthColor, spacing, type } from '@/theme';
 
@@ -147,7 +148,7 @@ export default function CalendarScreen() {
             </View>
             {todayEntries.length > 0 ? (
               <Text style={styles.todayEmoji} numberOfLines={2}>
-                {todayEntries.map((e) => e.emoji ?? '•').join('  ')}
+                {todayEntries.map((e) => categoryEmoji(e.emoji)).join('  ')}
               </Text>
             ) : (
               <Text style={styles.todayEmpty}>Nothing logged yet. What did you eat today?</Text>

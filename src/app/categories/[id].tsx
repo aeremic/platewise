@@ -14,6 +14,8 @@ import {
 } from '@/data/categoriesRepo';
 import type { Category } from '@/db/schema';
 import { HEALTH_LABELS, HEALTH_LEVELS, type HealthLevel } from '@/domain/health';
+import { categoryEvents } from '@/lib/categoryEvents';
+import { FALLBACK_EMOJI, FOOD_EMOJIS } from '@/lib/emoji';
 import { haptics } from '@/lib/haptics';
 import { colors, healthColor, spacing, type, withAlpha } from '@/theme';
 
@@ -55,8 +57,11 @@ export default function CategoryEditorSheet() {
     }
 
     const input = { name: trimmed, emoji, health };
-    if (existing) await updateCategory(existing.id, input);
-    else await createCategory(input);
+    if (existing) {
+      await updateCategory(existing.id, input);
+    } else {
+      categoryEvents.emitCreated(await createCategory(input));
+    }
     haptics.success();
     router.back();
   };
@@ -101,7 +106,7 @@ export default function CategoryEditorSheet() {
         <TextInput
           value={emoji}
           onChangeText={(text) => setEmoji(lastGrapheme(text))}
-          placeholder="🍽️"
+          placeholder={FALLBACK_EMOJI}
           placeholderTextColor={colors.textTertiary}
           style={[styles.input, styles.emojiInput]}
           accessibilityLabel="Emoji"
@@ -124,6 +129,29 @@ export default function CategoryEditorSheet() {
         />
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      {/* A plain grid, not a ScrollView: form sheets pin any ScrollView over their header. */}
+      <View style={styles.emojiGrid}>
+        {FOOD_EMOJIS.map((option) => {
+          const selected = option === (emoji || FALLBACK_EMOJI);
+          return (
+            <Pressable
+              key={option}
+              accessibilityRole="button"
+              accessibilityLabel={`Use ${option}`}
+              accessibilityState={{ selected }}
+              onPress={() => {
+                haptics.tap();
+                setEmoji(option === FALLBACK_EMOJI ? '' : option);
+              }}
+              style={({ pressed }) => [styles.emojiCell, { transform: [{ scale: pressed ? 0.9 : 1 }] }]}>
+              <View style={[styles.emojiOption, selected && styles.emojiOptionSelected]}>
+                <Text style={styles.emojiOptionText}>{option}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
 
       <Text style={styles.label}>How healthy is it?</Text>
       <View style={styles.levels}>
@@ -223,6 +251,31 @@ const styles = StyleSheet.create({
   },
   nameInput: {
     flex: 1,
+  },
+  emojiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: -spacing.xs,
+  },
+  emojiCell: {
+    width: '12.5%',
+    aspectRatio: 1,
+    padding: 2,
+  },
+  emojiOption: {
+    flex: 1,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  emojiOptionSelected: {
+    backgroundColor: colors.pressedFill,
+    borderColor: colors.accent,
+  },
+  emojiOptionText: {
+    fontSize: 24,
   },
   error: {
     color: colors.destructive,

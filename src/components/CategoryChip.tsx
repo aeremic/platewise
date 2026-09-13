@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { HealthLevel } from '@/domain/health';
+import { categoryEmoji } from '@/lib/emoji';
 import { colors, healthColor, withAlpha } from '@/theme';
 
 import { Icon } from './Icon';
@@ -41,7 +42,7 @@ export function CategoryChip({
         },
         selected && { boxShadow: `0 0 12px ${withAlpha(color, 0.45)}` },
       ]}>
-      {emoji ? <Text style={styles.emoji}>{emoji}</Text> : <View style={[styles.dot, { backgroundColor: color }]} />}
+      <Text style={styles.emoji}>{categoryEmoji(emoji)}</Text>
       <Text style={styles.name} numberOfLines={1}>
         {name}
       </Text>
@@ -83,11 +84,6 @@ const styles = StyleSheet.create({
   },
   emoji: {
     fontSize: 16,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
   },
   name: {
     color: colors.text,

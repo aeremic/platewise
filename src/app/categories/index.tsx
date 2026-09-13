@@ -21,6 +21,7 @@ import {
 import type { Category } from '@/db/schema';
 import { HEALTH_LABELS, HEALTH_LEVELS } from '@/domain/health';
 import { useLiveData } from '@/hooks/useLiveData';
+import { categoryEmoji } from '@/lib/emoji';
 import { haptics } from '@/lib/haptics';
 import { colors, spacing, type } from '@/theme';
 
@@ -41,11 +42,12 @@ export default function CategoriesScreen() {
   const confirmRestoreDefaults = () =>
     Alert.alert(
       'Restore default categories?',
-      'Built-in categories come back with their original names and colors. Categories you created stay as they are.',
+      'Built-in categories come back with their original names, emoji and colors. Categories you created are removed; days you already logged keep their colors.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Restore',
+          style: 'destructive',
           onPress: async () => {
             await restoreDefaultCategories();
             haptics.success();
@@ -172,7 +174,7 @@ function CategoryRow({
         !isLast && styles.rowDivider,
         pressed && { backgroundColor: colors.pressedFill },
       ]}>
-      <Text style={styles.rowEmoji}>{category.emoji ?? '🍽️'}</Text>
+      <Text style={styles.rowEmoji}>{categoryEmoji(category.emoji)}</Text>
       <Text style={styles.rowName} numberOfLines={1}>
         {category.name}
       </Text>

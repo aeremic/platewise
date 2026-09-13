@@ -14,8 +14,10 @@ export const categories = sqliteTable(
     sortOrder: integer('sort_order').notNull().default(0),
     /** Stable key for built-in categories; null for ones the user created. */
     seedKey: text('seed_key'),
-    /** Hidden from pickers but kept so past entries still resolve. */
+    /** Hidden from pickers but kept so past entries still resolve; restorable from Categories. */
     archivedAt: text('archived_at'),
+    /** Removed for good (e.g. by "Restore defaults"); kept only so past entries still resolve. */
+    deletedAt: text('deleted_at'),
     createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
     updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
   },
