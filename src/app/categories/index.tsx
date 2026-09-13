@@ -1,5 +1,10 @@
 import { router, Stack } from 'expo-router';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import Animated, {
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AmbientBackground } from '@/components/AmbientBackground';
@@ -21,6 +26,12 @@ import { colors, spacing, type } from '@/theme';
 
 export default function CategoriesScreen() {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y;
+  });
+  const backgroundStyle = useAnimatedStyle(() => ({ transform: [{ translateY: scrollY.value }] }));
   const { data: active = [] } = useLiveData(listActiveCategories, ['categories'], 'active');
   const { data: archived = [] } = useLiveData(listArchivedCategories, ['categories'], 'archived');
 
@@ -44,7 +55,7 @@ export default function CategoriesScreen() {
     );
 
   return (
-    <View style={styles.screen}>
+    <>
       <Stack.Screen
         options={{
           headerRight: () => (
@@ -59,10 +70,18 @@ export default function CategoriesScreen() {
           ),
         }}
       />
-      <AmbientBackground />
-      <ScrollView
+      {/* The ScrollView must be the screen's root view so the iOS large title can collapse
+          and the header gets its scroll-edge effect; the background therefore lives inside it
+          and is counter-translated to stay fixed. */}
+      <Animated.ScrollView
+        style={styles.screen}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}>
+        <Animated.View pointerEvents="none" style={[styles.background, { height: windowHeight }, backgroundStyle]}>
+          <AmbientBackground />
+        </Animated.View>
         <Text style={styles.intro}>
           Colors decide how each day looks on your calendar. Changing a color also updates past days.
         </Text>
@@ -127,8 +146,8 @@ export default function CategoriesScreen() {
           <Icon ios="arrow.counterclockwise" android="restart_alt" size={16} color={colors.textSecondary} />
           <Text style={styles.restoreText}>Restore defaults</Text>
         </GlassButton>
-      </ScrollView>
-    </View>
+      </Animated.ScrollView>
+    </>
   );
 }
 
@@ -179,6 +198,12 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  background: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
   },
   content: {
     paddingHorizontal: spacing.lg,

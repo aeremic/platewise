@@ -1,3 +1,43 @@
 # Expo HAS CHANGED
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
+
+# Platewise
+
+Food diary calendar for iOS + Android. Log what you ate per day by category; each category is
+green / orange / red, and each calendar day is colored by the average of its entries.
+Local-only (SQLite), no accounts, dark theme with Liquid Glass.
+
+## Stack
+
+- Expo SDK 57 (React Native 0.86, New Architecture), TypeScript, Expo Router.
+- Development builds only (`npm run ios` / `npm run android`), not Expo Go. `/ios` and `/android` are generated (prebuild) and git-ignored.
+- No `expo-dev-client`: debug builds load JS from Metro (`npm start`). Don't start Metro with `--localhost` — the Android emulator reaches the host via IPv4 `10.0.2.2`.
+- SQLite via `expo-sqlite` + Drizzle ORM. Schema: `src/db/schema.ts`. After changing it run `npm run db:generate` and commit the new files in `drizzle/`. Never edit an already-shipped migration.
+- Glass: `src/components/glass/Glass.tsx` uses native `GlassView` on iOS 26+ and a translucent + gradient-highlight fallback elsewhere (Android has no native liquid glass).
+
+## Layout
+
+- `src/app/` routes: `index` (calendar), `day` (form sheet: log/remove entries for a date, `?date=YYYY-MM-DD`), `categories/index`, `categories/[id]` (form sheet; `id=new` to create).
+- `src/domain/` pure logic with unit tests (`npm test`). `health.ts` holds the day-color rule; reuse it for monthly stats.
+- `src/data/` all database access. Screens read through `useLiveData` (`src/hooks/useLiveData.ts`), which re-queries when listed tables change.
+
+## Decisions
+
+- Health level is an integer: 0 red, 1 orange, 2 green. Day level = average of entries; ≥1.5 green, ≥0.75 orange, else red.
+- Day color always uses the category's *current* health, so recoloring a category recolors past days (user's choice).
+- Logging the same category twice = two entries; no servings.
+- Dates are stored as local `YYYY-MM-DD` text, never timestamps.
+- Built-in categories (with `seed_key`) and categories with entries are archived, not deleted.
+- Weeks start on Monday. UI language: English.
+- Planned later: monthly statistics (aggregate `entries` joined to `categories` by month with `levelFromAverage`).
+
+## iOS gotchas (found on device)
+
+- Form sheet with a ScrollView: the sheet expects exactly `[header, ScrollView]` — give the header `collapsable={false}` or the ScrollView covers it.
+- Don't make `GlassView` `isInteractive` inside a `Pressable`: native interactive glass swallows the first tap.
+- Screens with `headerLargeTitle` must have the ScrollView as the root view (no wrapper), otherwise the title never collapses. Put decorative backgrounds inside the ScrollView.
+
+## Checks
+
+`npm run typecheck`, `npm run lint`, `npm test`.

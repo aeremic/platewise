@@ -38,7 +38,8 @@ export function GlassButton({
         onPress();
       }}
       style={({ pressed }) => [style, { transform: [{ scale: pressed ? 0.95 : 1 }] }]}>
-      <Glass interactive radius={radius} tint={tint} style={[styles.content, contentStyle]}>
+      {/* Not `interactive`: native interactive glass swallows the first tap before Pressable sees it. */}
+      <Glass radius={radius} tint={tint} style={[styles.content, contentStyle]}>
         {children}
       </Glass>
     </Pressable>

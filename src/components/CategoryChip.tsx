@@ -45,8 +45,13 @@ export function CategoryChip({
       <Text style={styles.name} numberOfLines={1}>
         {name}
       </Text>
-      {selected ? <Icon ios="checkmark" android="check" size={14} color={colors.text} /> : null}
       {removable ? <Icon ios="xmark" android="close" size={12} color={colors.textSecondary} /> : null}
+      {/* Overlaid badge so selecting doesn't change the chip's width and reflow the rows. */}
+      {selected ? (
+        <View style={[styles.badge, { backgroundColor: color }]}>
+          <Icon ios="checkmark" android="check" size={10} color={colors.background} />
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -89,5 +94,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     flexShrink: 1,
+  },
+  badge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.background,
   },
 });

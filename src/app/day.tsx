@@ -77,7 +77,9 @@ export default function DaySheet() {
 
   return (
     <View style={styles.sheet}>
-      <View style={styles.topBar}>
+      {/* A form sheet with a ScrollView expects exactly [header, ScrollView]; without
+          collapsable={false} the header is flattened away and the ScrollView covers it. */}
+      <View style={styles.topBar} collapsable={false}>
         <IconButton size={40} accessibilityLabel="Close" onPress={() => router.back()}>
           <Icon ios="xmark" android="close" size={16} />
         </IconButton>
@@ -95,152 +97,152 @@ export default function DaySheet() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag">
-      {/* Date navigation */}
-      <View style={styles.header}>
-        <IconButton size={36} accessibilityLabel="Previous day" onPress={() => changeDate(toDateKey(addDays(day, -1)))}>
-          <Icon ios="chevron.left" android="chevron_left" size={16} />
-        </IconButton>
+        {/* Date navigation */}
+        <View style={styles.header}>
+          <IconButton size={36} accessibilityLabel="Previous day" onPress={() => changeDate(toDateKey(addDays(day, -1)))}>
+            <Icon ios="chevron.left" android="chevron_left" size={16} />
+          </IconButton>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Change date, currently ${format(day, 'EEEE, MMMM d')}`}
-          onPress={() => {
-            haptics.tap();
-            setPickerMonth((m) => (m ? null : startOfMonth(day)));
-          }}
-          style={styles.dateButton}>
-          <Text style={styles.overline}>{isToday ? 'Today' : format(day, 'EEEE')}</Text>
-          <View style={styles.dateRow}>
-            <Text style={styles.dateTitle}>{format(day, 'MMM d, yyyy')}</Text>
-            <Icon
-              ios={pickerMonth ? 'chevron.up' : 'chevron.down'}
-              android={pickerMonth ? 'expand_less' : 'expand_more'}
-              size={12}
-              color={colors.textSecondary}
-            />
-          </View>
-        </Pressable>
-
-        <IconButton size={36} accessibilityLabel="Next day" onPress={() => changeDate(toDateKey(addDays(day, 1)))}>
-          <Icon ios="chevron.right" android="chevron_right" size={16} />
-        </IconButton>
-      </View>
-
-      {pickerMonth ? (
-        <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(120)}>
-          <Glass radius={24} style={styles.picker}>
-            <View style={styles.pickerHeader}>
-              <IconButton
-                size={32}
-                accessibilityLabel="Previous month"
-                onPress={() => setPickerMonth((m) => m && addMonths(m, -1))}>
-                <Icon ios="chevron.left" android="chevron_left" size={14} />
-              </IconButton>
-              <Text style={styles.pickerTitle}>{format(pickerMonth, 'MMMM yyyy')}</Text>
-              <IconButton
-                size={32}
-                accessibilityLabel="Next month"
-                onPress={() => setPickerMonth((m) => m && addMonths(m, 1))}>
-                <Icon ios="chevron.right" android="chevron_right" size={14} />
-              </IconButton>
-            </View>
-            <MonthGrid
-              compact
-              month={pickerMonth}
-              summaries={pickerSummaries}
-              selectedKey={date}
-              onSelectDay={changeDate}
-            />
-          </Glass>
-        </Animated.View>
-      ) : null}
-
-      {/* Already logged */}
-      <Animated.View layout={LinearTransition.duration(200)} style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Logged</Text>
-          {dayLevel != null ? (
-            <View style={styles.dayLevel}>
-              <HealthDot level={dayLevel} />
-              <Text style={[styles.dayLevelText, { color: healthColor(dayLevel) }]}>
-                {HEALTH_LABELS[dayLevel]} day
-              </Text>
-            </View>
-          ) : null}
-        </View>
-        {logged.length > 0 ? (
-          <View style={styles.chips}>
-            {logged.map((entry) => (
-              <CategoryChip
-                key={entry.id}
-                name={entry.name}
-                emoji={entry.emoji}
-                health={entry.health}
-                removable
-                accessibilityLabel={`Remove ${entry.name}`}
-                onPress={() => remove(entry.id)}
-              />
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.empty}>Nothing logged for this day yet.</Text>
-        )}
-      </Animated.View>
-
-      {/* Add food */}
-      <Animated.View layout={LinearTransition.duration(200)} style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Add food</Text>
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push({ pathname: '/categories/[id]', params: { id: 'new' } })}
-            hitSlop={8}>
-            <Text style={styles.link}>New category</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.search}>
-          <Icon ios="magnifyingglass" android="search" size={16} color={colors.textTertiary} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search categories"
-            placeholderTextColor={colors.textTertiary}
-            style={styles.searchInput}
-            autoCorrect={false}
-            returnKeyType="search"
-            clearButtonMode="while-editing"
-          />
-        </View>
-
-        {HEALTH_LEVELS.map((level) => {
-          const group = visibleCategories.filter((c) => c.health === level);
-          if (group.length === 0) return null;
-          return (
-            <View key={level} style={styles.group}>
-              <View style={styles.groupHeader}>
-                <HealthDot level={level} />
-                <Text style={styles.groupTitle}>{HEALTH_LABELS[level]}</Text>
-              </View>
-              <View style={styles.chips}>
-                {group.map((category) => (
-                  <CategoryChip
-                    key={category.id}
-                    name={category.name}
-                    emoji={category.emoji}
-                    health={category.health}
-                    selected={selectedIds.includes(category.id)}
-                    onPress={() => toggle(category.id)}
-                  />
-                ))}
-              </View>
+            accessibilityLabel={`Change date, currently ${format(day, 'EEEE, MMMM d')}`}
+            onPress={() => {
+              haptics.tap();
+              setPickerMonth((m) => (m ? null : startOfMonth(day)));
+            }}
+            style={styles.dateButton}>
+            <Text style={styles.overline}>{isToday ? 'Today' : format(day, 'EEEE')}</Text>
+            <View style={styles.dateRow}>
+              <Text style={styles.dateTitle}>{format(day, 'MMM d, yyyy')}</Text>
+              <Icon
+                ios={pickerMonth ? 'chevron.up' : 'chevron.down'}
+                android={pickerMonth ? 'expand_less' : 'expand_more'}
+                size={12}
+                color={colors.textSecondary}
+              />
             </View>
-          );
-        })}
-        {visibleCategories.length === 0 ? (
-          <Text style={styles.empty}>No categories match “{query.trim()}”.</Text>
+          </Pressable>
+
+          <IconButton size={36} accessibilityLabel="Next day" onPress={() => changeDate(toDateKey(addDays(day, 1)))}>
+            <Icon ios="chevron.right" android="chevron_right" size={16} />
+          </IconButton>
+        </View>
+
+        {pickerMonth ? (
+          <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(120)}>
+            <Glass radius={24} style={styles.picker}>
+              <View style={styles.pickerHeader}>
+                <IconButton
+                  size={32}
+                  accessibilityLabel="Previous month"
+                  onPress={() => setPickerMonth((m) => m && addMonths(m, -1))}>
+                  <Icon ios="chevron.left" android="chevron_left" size={14} />
+                </IconButton>
+                <Text style={styles.pickerTitle}>{format(pickerMonth, 'MMMM yyyy')}</Text>
+                <IconButton
+                  size={32}
+                  accessibilityLabel="Next month"
+                  onPress={() => setPickerMonth((m) => m && addMonths(m, 1))}>
+                  <Icon ios="chevron.right" android="chevron_right" size={14} />
+                </IconButton>
+              </View>
+              <MonthGrid
+                compact
+                month={pickerMonth}
+                summaries={pickerSummaries}
+                selectedKey={date}
+                onSelectDay={changeDate}
+              />
+            </Glass>
+          </Animated.View>
         ) : null}
-      </Animated.View>
+
+        {/* Already logged */}
+        <Animated.View layout={LinearTransition.duration(200)} style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Logged</Text>
+            {dayLevel != null ? (
+              <View style={styles.dayLevel}>
+                <HealthDot level={dayLevel} />
+                <Text style={[styles.dayLevelText, { color: healthColor(dayLevel) }]}>
+                  {HEALTH_LABELS[dayLevel]} day
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          {logged.length > 0 ? (
+            <View style={styles.chips}>
+              {logged.map((entry) => (
+                <CategoryChip
+                  key={entry.id}
+                  name={entry.name}
+                  emoji={entry.emoji}
+                  health={entry.health}
+                  removable
+                  accessibilityLabel={`Remove ${entry.name}`}
+                  onPress={() => remove(entry.id)}
+                />
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.empty}>Nothing logged for this day yet.</Text>
+          )}
+        </Animated.View>
+
+        {/* Add food */}
+        <Animated.View layout={LinearTransition.duration(200)} style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Add food</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push({ pathname: '/categories/[id]', params: { id: 'new' } })}
+              hitSlop={8}>
+              <Text style={styles.link}>New category</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.search}>
+            <Icon ios="magnifyingglass" android="search" size={16} color={colors.textTertiary} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search categories"
+              placeholderTextColor={colors.textTertiary}
+              style={styles.searchInput}
+              autoCorrect={false}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+            />
+          </View>
+
+          {HEALTH_LEVELS.map((level) => {
+            const group = visibleCategories.filter((c) => c.health === level);
+            if (group.length === 0) return null;
+            return (
+              <View key={level} style={styles.group}>
+                <View style={styles.groupHeader}>
+                  <HealthDot level={level} />
+                  <Text style={styles.groupTitle}>{HEALTH_LABELS[level]}</Text>
+                </View>
+                <View style={styles.chips}>
+                  {group.map((category) => (
+                    <CategoryChip
+                      key={category.id}
+                      name={category.name}
+                      emoji={category.emoji}
+                      health={category.health}
+                      selected={selectedIds.includes(category.id)}
+                      onPress={() => toggle(category.id)}
+                    />
+                  ))}
+                </View>
+              </View>
+            );
+          })}
+          {visibleCategories.length === 0 ? (
+            <Text style={styles.empty}>No categories match “{query.trim()}”.</Text>
+          ) : null}
+        </Animated.View>
       </ScrollView>
     </View>
   );

@@ -33,7 +33,7 @@ export const DEFAULT_CATEGORIES: readonly DefaultCategory[] = [
   { seedKey: 'ice_cream', name: 'Ice cream', emoji: '🍦', health: 0 },
   { seedKey: 'burger', name: 'Burger', emoji: '🍔', health: 0 },
   { seedKey: 'fries', name: 'Fries', emoji: '🍟', health: 0 },
-  { seedKey: 'chips', name: 'Chips', emoji: '🥔', health: 0 },
+  { seedKey: 'chips', name: 'Chips & snacks', emoji: '🍿', health: 0 },
   { seedKey: 'sweets', name: 'Sweets & chocolate', emoji: '🍫', health: 0 },
   { seedKey: 'soda', name: 'Soda', emoji: '🥤', health: 0 },
   { seedKey: 'cake', name: 'Cake & pastry', emoji: '🍰', health: 0 },
