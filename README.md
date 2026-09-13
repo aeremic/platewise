@@ -1,56 +1,40 @@
-# Welcome to your Expo app 👋
+# Platewise
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A food diary calendar for iOS and Android. Log what you ate each day by category, and see at a glance how healthy each day was: every category is green, orange or red, and each calendar day takes the color of its average.
 
-## Get started
+- Calendar home with color-coded days and a quick **Add food** button
+- Day sheet to log or remove foods for any date
+- Editable categories (name, emoji, health color) with sensible defaults
+- Everything stays on the device (SQLite) — no account, no network
+- Dark theme with Liquid Glass on iOS 26 and a frosted-glass look on Android
 
-1. Install dependencies
+## Tech
 
-   ```bash
-   npm install
-   ```
+Expo SDK 57 · React Native 0.86 · TypeScript · Expo Router · expo-sqlite + Drizzle ORM · expo-glass-effect
 
-2. Start the app
+## Getting started
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Requirements: Node.js, Xcode (for iOS) and/or the Android SDK with an emulator, JDK 17.
 
 ```bash
-npm run reset-project
+npm install
+npm run ios       # build and run on the iOS simulator
+npm run android   # build and run on the Android emulator
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+These are development builds (not Expo Go). After the first build, start the bundler with `npm start` and reopen the installed app.
 
-### Other setup steps
+## Development
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```bash
+npm run typecheck
+npm run lint
+npm test
+npm run db:generate   # after changing src/db/schema.ts
+```
 
-## Learn more
+Project structure and conventions are documented in [AGENTS.md](AGENTS.md).
 
-To learn more about developing your project with Expo, look at the following resources:
+## License
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+[MIT](LICENSE)
