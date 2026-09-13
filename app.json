@@ -9,7 +9,7 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#05060A",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/platewise.icon",
       "bundleIdentifier": "com.platewise.app",
       "supportsTablet": false
     },
@@ -30,7 +30,7 @@
         {
           "backgroundColor": "#05060A",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 160
         }
       ],
       "expo-sqlite"

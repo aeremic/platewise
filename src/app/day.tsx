@@ -1,6 +1,6 @@
 import { addDays, addMonths, format, startOfMonth } from 'date-fns';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,11 +10,12 @@ import { CategoryChip, HealthDot } from '@/components/CategoryChip';
 import { Glass } from '@/components/glass/Glass';
 import { GlassButton, IconButton } from '@/components/glass/GlassButton';
 import { Icon } from '@/components/Icon';
-import { listActiveCategories } from '@/data/categoriesRepo';
+import { listActiveCategories, listRecentCategories } from '@/data/categoriesRepo';
 import { addEntries, deleteEntry, getDaySummaries, getEntriesForDate } from '@/data/entriesRepo';
 import { fromDateKey, gridRange, isDateKey, todayKey, toDateKey, type DateKey } from '@/domain/dates';
 import { HEALTH_LABELS, HEALTH_LEVELS, scoreDay } from '@/domain/health';
 import { useLiveData } from '@/hooks/useLiveData';
+import { categoryEvents } from '@/lib/categoryEvents';
 import { haptics } from '@/lib/haptics';
 import { colors, healthColor, spacing, type } from '@/theme';
 
@@ -33,6 +34,13 @@ export default function DaySheet() {
     date,
   );
   const { data: categories = [] } = useLiveData(listActiveCategories, ['categories'], 'active');
+  const { data: recent = [] } = useLiveData(() => listRecentCategories(), ['entries', 'categories'], 'recent');
+
+  // A category created from this sheet's "New category" link is selected right away.
+  useEffect(
+    () => categoryEvents.onCreated((id) => setSelectedIds((ids) => (ids.includes(id) ? ids : [...ids, id]))),
+    [],
+  );
 
   const pickerRange = pickerMonth ? gridRange(pickerMonth) : null;
   const { data: pickerSummaries } = useLiveData(
@@ -201,6 +209,32 @@ export default function DaySheet() {
             </Pressable>
           </View>
 
+          {recent.length > 0 && !normalizedQuery ? (
+            <View style={styles.group}>
+              <View style={styles.groupHeader}>
+                <Icon ios="clock" android="schedule" size={12} color={colors.textSecondary} />
+                <Text style={styles.groupTitle}>Recent</Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                style={styles.recentScroll}
+                contentContainerStyle={styles.recentRow}>
+                {recent.map((category) => (
+                  <CategoryChip
+                    key={category.id}
+                    name={category.name}
+                    emoji={category.emoji}
+                    health={category.health}
+                    selected={selectedIds.includes(category.id)}
+                    onPress={() => toggle(category.id)}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
+
           <View style={styles.search}>
             <Icon ios="magnifyingglass" android="search" size={16} color={colors.textTertiary} />
             <TextInput
@@ -356,6 +390,17 @@ const styles = StyleSheet.create({
   },
   group: {
     gap: spacing.sm,
+  },
+  recentScroll: {
+    // Bleed to the sheet edges so the row scrolls edge to edge.
+    marginHorizontal: -spacing.lg,
+  },
+  recentRow: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    // Room for the selected-chip badge, which overhangs the chip.
+    paddingTop: 6,
+    paddingBottom: 2,
   },
   groupHeader: {
     flexDirection: 'row',
