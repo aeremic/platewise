@@ -119,6 +119,18 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
+            name="settings/backup"
+            options={{
+              headerShown: true,
+              title: 'Backup',
+              headerLargeTitle: Platform.OS === 'ios',
+              headerTransparent: Platform.OS === 'ios',
+              headerTintColor: colors.text,
+              headerStyle: Platform.OS === 'ios' ? undefined : { backgroundColor: colors.background },
+              headerBackButtonDisplayMode: 'minimal',
+            }}
+          />
+          <Stack.Screen
             name="settings/goals"
             options={{
               presentation: 'formSheet',

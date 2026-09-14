@@ -47,6 +47,14 @@ Local-only (SQLite), no accounts, dark theme with Liquid Glass.
 - Weeks start on Monday. UI language: English.
 - Planned later: monthly statistics — reuse `getDaySummaries` / `rateDay` per day so stats and calendar agree.
 
+## Backup (Settings → Backup)
+
+- Format: `src/domain/backup.ts` — one JSON file `{ app: 'platewise', formatVersion, schemaVersion, exportedAt, platform, appVersion, data: { categories, entries, dailyGoals } }` with **all rows including hidden/removed categories and full goal history**, ids preserved. Same file on iOS and Android.
+- `schemaVersion` = number of drizzle migrations. `parseBackup` accepts older files (missing later fields get defaults — add a default there whenever a migration adds a column) and rejects files from a newer app, invalid JSON, broken references, duplicate ids.
+- Export (`src/services/backupFiles.ts`): iOS share sheet (Save to Files / AirDrop); Android "Save to phone…" via `Directory.pickDirectoryAsync` (SAF) plus "Share…".
+- Import **replaces everything** (user's choice) in one transaction (`replaceAllData`), then re-seeds missing built-ins. Before importing, current data is written to `Paths.document/platewise-before-import.json`; "Undo last import" restores it.
+- When adding a table or column, update `BackupData`, `readAllData`/`replaceAllData` and the parser + `src/domain/__tests__/backup.test.ts`.
+
 ## iOS gotchas (found on device)
 
 - Form sheet with a ScrollView: the sheet expects exactly `[header, ScrollView]` — give the header `collapsable={false}` or the ScrollView covers it. A `fitToContents` sheet must not contain any ScrollView (even a horizontal one); use wrapping grids instead.
