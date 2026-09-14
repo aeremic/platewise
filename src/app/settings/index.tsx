@@ -32,6 +32,13 @@ export default function SettingsScreen() {
           title="Categories"
           subtitle={`${categories.length} categories · colors & nutrition`}
           onPress={() => router.push('/categories')}
+        />
+        <Row
+          ios="externaldrive"
+          android="backup"
+          title="Backup"
+          subtitle="Export or import all your data"
+          onPress={() => router.push('/settings/backup')}
           isLast
         />
       </Glass>
