@@ -31,7 +31,7 @@ Local-only (SQLite), no accounts, dark theme with Liquid Glass.
 - Health level is an integer: 0 red, 1 orange, 2 green. Day color = `rateDay` (`src/domain/dayRating.ts`), the only place the rule lives:
   1. food quality = health averaged with weight = entry kcal, min 100 kcal/portion, 200 kcal/portion if unknown (big unhealthy portions count more; light greens still count); ≥1.5 green, ≥0.75 orange, else red;
   2. then the day's goals: fiber target reached → +1 step; over kcal/sugar limit → max orange; >25% over → red (limits applied last).
-  `explainRating` produces the reasons shown in the day sheet and (compact) on the Today card. Computed on read, so rule/category changes recolor past days (user's choice); each day uses its own goals via `goalsOn`.
+  `explainRating` produces the reasons shown in the day sheet and (compact) on the Today card. The day sheet and entry editor show `DayPreview` (color, reasons, goal bars) rated from saved entries **plus unsaved drafts/edits**, so it updates live; nothing is written until Save, so closing restores the saved state. Computed on read, so rule/category changes recolor past days (user's choice); each day uses its own goals via `goalsOn`.
 - Day color always uses the category's *current* health, so recoloring a category recolors past days (user's choice).
 - Logging the same category twice = two entries; no servings.
 - Dates are stored as local `YYYY-MM-DD` text, never timestamps.

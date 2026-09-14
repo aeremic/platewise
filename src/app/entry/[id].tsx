@@ -9,8 +9,13 @@ import { Icon } from '@/components/Icon';
 import { withPortions, type Amount } from '@/components/nutrition/AmountCard';
 import { NutritionFields } from '@/components/nutrition/NutritionFields';
 import { PortionStepper } from '@/components/nutrition/PortionStepper';
-import { deleteEntry, getEntry, updateEntry, type EntryWithCategory } from '@/data/entriesRepo';
+import { DayPreview } from '@/components/rating/DayPreview';
+import { deleteEntry, getEntriesForDate, getEntry, updateEntry, type EntryWithCategory } from '@/data/entriesRepo';
+import { getGoalsForDate } from '@/data/goalsRepo';
+import { rateDay } from '@/domain/dayRating';
 import { fromDateKey } from '@/domain/dates';
+import { NUTRIENTS } from '@/domain/nutrition';
+import { useLiveData } from '@/hooks/useLiveData';
 import { categoryEmoji } from '@/lib/emoji';
 import { haptics } from '@/lib/haptics';
 import { colors, spacing, type } from '@/theme';
@@ -30,6 +35,31 @@ export default function EntryEditorSheet() {
       setAmount({ portions: loaded.portions, nutrition: loaded.nutrition });
     });
   }, [id]);
+
+  // Live preview of the whole day with this food's unsaved amounts; closing discards them.
+  const dayKey = entry?.date ?? '';
+  const { data: dayEntries = [] } = useLiveData(
+    () => (entry ? getEntriesForDate(entry.date) : Promise.resolve([])),
+    ['entries', 'categories'],
+    dayKey,
+  );
+  const { data: dayGoals } = useLiveData(
+    () => (entry ? getGoalsForDate(entry.date) : Promise.resolve(undefined)),
+    ['daily_goals'],
+    dayKey,
+  );
+  const changed =
+    !!entry &&
+    !!amount &&
+    (amount.portions !== entry.portions ||
+      NUTRIENTS.some((key) => amount.nutrition[key] !== entry.nutrition[key]));
+  const rating =
+    entry && amount && dayGoals
+      ? rateDay(
+          dayEntries.map((e) => (e.id === entry.id ? { ...e, portions: amount.portions, nutrition: amount.nutrition } : e)),
+          dayGoals,
+        )
+      : null;
 
   const save = async () => {
     if (!entry || !amount) return;
@@ -96,6 +126,10 @@ export default function EntryEditorSheet() {
           <Text style={styles.hint}>
             Changing portions scales these values. They stay as saved even if you edit the category later.
           </Text>
+
+          {rating && dayGoals ? (
+            <DayPreview rating={rating} goals={dayGoals} unsavedLabel={changed ? 'includes unsaved changes' : null} />
+          ) : null}
 
           <Pressable accessibilityRole="button" onPress={confirmRemove} style={styles.remove} hitSlop={8}>
             <Icon ios="trash" android="delete" size={16} color={colors.destructive} />
