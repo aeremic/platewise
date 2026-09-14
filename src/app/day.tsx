@@ -10,14 +10,28 @@ import { CategoryChip, HealthDot } from '@/components/CategoryChip';
 import { Glass } from '@/components/glass/Glass';
 import { GlassButton, IconButton } from '@/components/glass/GlassButton';
 import { Icon } from '@/components/Icon';
-import { listActiveCategories, listRecentCategories } from '@/data/categoriesRepo';
-import { addEntries, deleteEntry, getDaySummaries, getEntriesForDate } from '@/data/entriesRepo';
+import { AmountCard, type Amount } from '@/components/nutrition/AmountCard';
+import { getCategory, listActiveCategories, listRecentCategories } from '@/data/categoriesRepo';
+import { addEntries, getDaySummaries, getEntriesForDate } from '@/data/entriesRepo';
+import type { Category } from '@/db/schema';
 import { fromDateKey, gridRange, isDateKey, todayKey, toDateKey, type DateKey } from '@/domain/dates';
 import { HEALTH_LABELS, HEALTH_LEVELS, scoreDay } from '@/domain/health';
+import { formatPortions } from '@/domain/nutrition';
 import { useLiveData } from '@/hooks/useLiveData';
 import { categoryEvents } from '@/lib/categoryEvents';
 import { haptics } from '@/lib/haptics';
 import { colors, healthColor, spacing, type } from '@/theme';
+
+type Draft = Amount & { category: Category };
+
+/** One portion with the category's current values, which get snapshotted when saved. */
+function draftFor(category: Category): Draft {
+  return {
+    category,
+    portions: 1,
+    nutrition: { kcal: category.kcal, fiberG: category.fiberG, sugarG: category.sugarG },
+  };
+}
 
 export default function DaySheet() {
   const params = useLocalSearchParams<{ date?: string }>();
@@ -25,7 +39,7 @@ export default function DaySheet() {
 
   const [date, setDate] = useState<DateKey>(() => (isDateKey(params.date) ? params.date : todayKey()));
   const [pickerMonth, setPickerMonth] = useState<Date | null>(null);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
   const [query, setQuery] = useState('');
 
   const { data: logged = [] } = useLiveData(
@@ -36,9 +50,15 @@ export default function DaySheet() {
   const { data: categories = [] } = useLiveData(listActiveCategories, ['categories'], 'active');
   const { data: recent = [] } = useLiveData(() => listRecentCategories(), ['entries', 'categories'], 'recent');
 
+  const addDraft = (category: Category) =>
+    setDrafts((ds) => (ds.some((d) => d.category.id === category.id) ? ds : [...ds, draftFor(category)]));
+
   // A category created from this sheet's "New category" link is selected right away.
   useEffect(
-    () => categoryEvents.onCreated((id) => setSelectedIds((ids) => (ids.includes(id) ? ids : [...ids, id]))),
+    () =>
+      categoryEvents.onCreated((id) => {
+        void getCategory(id).then((category) => category && addDraft(category));
+      }),
     [],
   );
 
@@ -64,24 +84,31 @@ export default function DaySheet() {
     setPickerMonth(null);
   };
 
-  const toggle = (id: number) => {
+  const selectedIds = drafts.map((d) => d.category.id);
+
+  const toggle = (category: Category) => {
     haptics.tap();
-    setSelectedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+    setDrafts((ds) =>
+      ds.some((d) => d.category.id === category.id)
+        ? ds.filter((d) => d.category.id !== category.id)
+        : [...ds, draftFor(category)],
+    );
   };
 
+  const updateDraft = (categoryId: number, amount: Amount) =>
+    setDrafts((ds) => ds.map((d) => (d.category.id === categoryId ? { ...d, ...amount } : d)));
+
   const save = async () => {
-    if (selectedIds.length === 0) return;
-    await addEntries(date, selectedIds);
+    if (drafts.length === 0) return;
+    await addEntries(
+      date,
+      drafts.map((d) => ({ categoryId: d.category.id, portions: d.portions, nutrition: d.nutrition })),
+    );
     haptics.success();
     router.back();
   };
 
-  const remove = (id: number) => {
-    haptics.warning();
-    void deleteEntry(id);
-  };
-
-  const count = selectedIds.length;
+  const count = drafts.length;
 
   return (
     <View style={styles.sheet}>
@@ -186,16 +213,36 @@ export default function DaySheet() {
                   name={entry.name}
                   emoji={entry.emoji}
                   health={entry.health}
-                  removable
-                  accessibilityLabel={`Remove ${entry.name}`}
-                  onPress={() => remove(entry.id)}
+                  detail={entry.portions !== 1 ? `${formatPortions(entry.portions)}×` : undefined}
+                  accessibilityLabel={`Edit ${entry.name}`}
+                  onPress={() => router.push({ pathname: '/entry/[id]', params: { id: String(entry.id) } })}
                 />
               ))}
             </View>
           ) : (
             <Text style={styles.empty}>Nothing logged for this day yet.</Text>
           )}
+          {logged.length > 0 ? <Text style={styles.hint}>Tap a food to change its amount or remove it.</Text> : null}
         </Animated.View>
+
+        {/* About to be logged */}
+        {drafts.length > 0 ? (
+          <Animated.View layout={LinearTransition.duration(200)} entering={FadeIn.duration(160)} style={styles.section}>
+            <Text style={styles.sectionTitle}>Adding</Text>
+            {drafts.map((draft) => (
+              <AmountCard
+                key={draft.category.id}
+                name={draft.category.name}
+                emoji={draft.category.emoji}
+                health={draft.category.health}
+                portionLabel={draft.category.portionLabel}
+                amount={draft}
+                onChange={(amount) => updateDraft(draft.category.id, amount)}
+                onRemove={() => toggle(draft.category)}
+              />
+            ))}
+          </Animated.View>
+        ) : null}
 
         {/* Add food */}
         <Animated.View layout={LinearTransition.duration(200)} style={styles.section}>
@@ -228,7 +275,7 @@ export default function DaySheet() {
                     emoji={category.emoji}
                     health={category.health}
                     selected={selectedIds.includes(category.id)}
-                    onPress={() => toggle(category.id)}
+                    onPress={() => toggle(category)}
                   />
                 ))}
               </ScrollView>
@@ -266,7 +313,7 @@ export default function DaySheet() {
                       emoji={category.emoji}
                       health={category.health}
                       selected={selectedIds.includes(category.id)}
-                      onPress={() => toggle(category.id)}
+                      onPress={() => toggle(category)}
                     />
                   ))}
                 </View>
@@ -366,6 +413,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+  },
+  hint: {
+    color: colors.textTertiary,
+    fontSize: 13,
   },
   empty: {
     color: colors.textSecondary,

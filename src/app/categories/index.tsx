@@ -1,17 +1,11 @@
 import { router, Stack } from 'expo-router';
-import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import Animated, {
-  useAnimatedScrollHandler,
-  useAnimatedStyle,
-  useSharedValue,
-} from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { AmbientBackground } from '@/components/AmbientBackground';
 import { HealthDot } from '@/components/CategoryChip';
 import { Glass } from '@/components/glass/Glass';
 import { GlassButton } from '@/components/glass/GlassButton';
 import { Icon } from '@/components/Icon';
+import { LargeTitleScrollView } from '@/components/LargeTitleScrollView';
 import {
   listActiveCategories,
   listArchivedCategories,
@@ -20,19 +14,13 @@ import {
 } from '@/data/categoriesRepo';
 import type { Category } from '@/db/schema';
 import { HEALTH_LABELS, HEALTH_LEVELS } from '@/domain/health';
+import { formatAmount } from '@/domain/nutrition';
 import { useLiveData } from '@/hooks/useLiveData';
 import { categoryEmoji } from '@/lib/emoji';
 import { haptics } from '@/lib/haptics';
 import { colors, spacing, type } from '@/theme';
 
 export default function CategoriesScreen() {
-  const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
-  const scrollY = useSharedValue(0);
-  const onScroll = useAnimatedScrollHandler((event) => {
-    scrollY.value = event.contentOffset.y;
-  });
-  const backgroundStyle = useAnimatedStyle(() => ({ transform: [{ translateY: scrollY.value }] }));
   const { data: active = [] } = useLiveData(listActiveCategories, ['categories'], 'active');
   const { data: archived = [] } = useLiveData(listArchivedCategories, ['categories'], 'archived');
 
@@ -72,18 +60,7 @@ export default function CategoriesScreen() {
           ),
         }}
       />
-      {/* The ScrollView must be the screen's root view so the iOS large title can collapse
-          and the header gets its scroll-edge effect; the background therefore lives inside it
-          and is counter-translated to stay fixed. */}
-      <Animated.ScrollView
-        style={styles.screen}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}>
-        <Animated.View pointerEvents="none" style={[styles.background, { height: windowHeight }, backgroundStyle]}>
-          <AmbientBackground />
-        </Animated.View>
+      <LargeTitleScrollView>
         <Text style={styles.intro}>
           Colors decide how each day looks on your calendar. Changing a color also updates past days.
         </Text>
@@ -148,7 +125,7 @@ export default function CategoriesScreen() {
           <Icon ios="arrow.counterclockwise" android="restart_alt" size={16} color={colors.textSecondary} />
           <Text style={styles.restoreText}>Restore defaults</Text>
         </GlassButton>
-      </Animated.ScrollView>
+      </LargeTitleScrollView>
     </>
   );
 }
@@ -164,6 +141,9 @@ function CategoryRow({
   actionLabel?: string;
   onPress: () => void;
 }) {
+  const meta = [category.kcal != null ? `${formatAmount('kcal', category.kcal)} kcal` : null, category.portionLabel]
+    .filter(Boolean)
+    .join(' · ');
   return (
     <Pressable
       accessibilityRole="button"
@@ -175,9 +155,16 @@ function CategoryRow({
         pressed && { backgroundColor: colors.pressedFill },
       ]}>
       <Text style={styles.rowEmoji}>{categoryEmoji(category.emoji)}</Text>
-      <Text style={styles.rowName} numberOfLines={1}>
-        {category.name}
-      </Text>
+      <View style={styles.rowText}>
+        <Text style={styles.rowName} numberOfLines={1}>
+          {category.name}
+        </Text>
+        {meta ? (
+          <Text style={styles.rowMeta} numberOfLines={1}>
+            {meta}
+          </Text>
+        ) : null}
+      </View>
       {actionLabel ? (
         <Text style={styles.rowAction}>{actionLabel}</Text>
       ) : (
@@ -191,26 +178,11 @@ function CategoryRow({
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   headerButton: {
     width: 36,
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  background: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-  },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    gap: spacing.xl,
   },
   intro: {
     color: colors.textSecondary,
@@ -264,10 +236,18 @@ const styles = StyleSheet.create({
     width: 28,
     textAlign: 'center',
   },
+  rowText: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+  },
   rowName: {
     ...type.body,
     color: colors.text,
-    flex: 1,
+  },
+  rowMeta: {
+    color: colors.textTertiary,
+    fontSize: 12,
+    marginTop: 1,
   },
   rowAction: {
     color: colors.accent,

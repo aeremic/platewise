@@ -90,6 +90,38 @@ export default function RootLayout() {
             name="categories/[id]"
             options={{
               presentation: 'formSheet',
+              sheetAllowedDetents: [1],
+              sheetGrabberVisible: true,
+              sheetCornerRadius: 32,
+              contentStyle: { backgroundColor: sheetBackground },
+            }}
+          />
+          <Stack.Screen
+            name="entry/[id]"
+            options={{
+              presentation: 'formSheet',
+              sheetAllowedDetents: 'fitToContents',
+              sheetGrabberVisible: true,
+              sheetCornerRadius: 32,
+              contentStyle: { backgroundColor: sheetBackground },
+            }}
+          />
+          <Stack.Screen
+            name="settings/index"
+            options={{
+              headerShown: true,
+              title: 'Settings',
+              headerLargeTitle: Platform.OS === 'ios',
+              headerTransparent: Platform.OS === 'ios',
+              headerTintColor: colors.text,
+              headerStyle: Platform.OS === 'ios' ? undefined : { backgroundColor: colors.background },
+              headerBackButtonDisplayMode: 'minimal',
+            }}
+          />
+          <Stack.Screen
+            name="settings/goals"
+            options={{
+              presentation: 'formSheet',
               sheetAllowedDetents: 'fitToContents',
               sheetGrabberVisible: true,
               sheetCornerRadius: 32,

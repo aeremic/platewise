@@ -11,8 +11,8 @@ type Props = {
   emoji: string | null;
   health: HealthLevel;
   selected?: boolean;
-  /** Shows a trailing × (used for already-logged entries). */
-  removable?: boolean;
+  /** Small trailing text, e.g. "2×" for a logged entry with two portions. */
+  detail?: string;
   onPress: () => void;
   accessibilityLabel?: string;
 };
@@ -22,7 +22,7 @@ export function CategoryChip({
   emoji,
   health,
   selected = false,
-  removable = false,
+  detail,
   onPress,
   accessibilityLabel,
 }: Props) {
@@ -46,7 +46,7 @@ export function CategoryChip({
       <Text style={styles.name} numberOfLines={1}>
         {name}
       </Text>
-      {removable ? <Icon ios="xmark" android="close" size={12} color={colors.textSecondary} /> : null}
+      {detail ? <Text style={styles.detail}>{detail}</Text> : null}
       {/* Overlaid badge so selecting doesn't change the chip's width and reflow the rows. */}
       {selected ? (
         <View style={[styles.badge, { backgroundColor: color }]}>
@@ -90,6 +90,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     flexShrink: 1,
+  },
+  detail: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
   badge: {
     position: 'absolute',

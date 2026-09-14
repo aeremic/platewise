@@ -4,11 +4,13 @@ import { db } from '@/db/client';
 import { DEFAULT_CATEGORIES } from '@/db/defaultCategories';
 import { categories, entries, type Category } from '@/db/schema';
 import type { HealthLevel } from '@/domain/health';
+import type { Nutrition } from '@/domain/nutrition';
 
-export type CategoryInput = {
+export type CategoryInput = Nutrition & {
   name: string;
   emoji: string | null;
   health: HealthLevel;
+  portionLabel: string | null;
 };
 
 const byHealthThenName = [desc(categories.health), asc(categories.sortOrder), asc(categories.name)];
@@ -114,7 +116,18 @@ export async function restoreDefaultCategories(): Promise<void> {
   db.transaction((tx) => {
     for (const c of DEFAULT_CATEGORIES) {
       tx.update(categories)
-        .set({ name: c.name, emoji: c.emoji, health: c.health, archivedAt: null, deletedAt: null, updatedAt: now })
+        .set({
+          name: c.name,
+          emoji: c.emoji,
+          health: c.health,
+          portionLabel: c.portionLabel,
+          kcal: c.kcal,
+          fiberG: c.fiberG,
+          sugarG: c.sugarG,
+          archivedAt: null,
+          deletedAt: null,
+          updatedAt: now,
+        })
         .where(eq(categories.seedKey, c.seedKey))
         .run();
     }
@@ -132,5 +145,14 @@ export async function restoreDefaultCategories(): Promise<void> {
 
 function normalize(input: CategoryInput): CategoryInput {
   const emoji = input.emoji?.trim();
-  return { name: input.name.trim(), emoji: emoji ? emoji : null, health: input.health };
+  const portionLabel = input.portionLabel?.trim();
+  return {
+    name: input.name.trim(),
+    emoji: emoji ? emoji : null,
+    health: input.health,
+    portionLabel: portionLabel ? portionLabel : null,
+    kcal: input.kcal,
+    fiberG: input.fiberG,
+    sugarG: input.sugarG,
+  };
 }
