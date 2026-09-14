@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassButton, IconButton } from '@/components/glass/GlassButton';
 import { Icon } from '@/components/Icon';
 import { NutritionFields } from '@/components/nutrition/NutritionFields';
+import { NutritionLookup } from '@/components/nutrition/NutritionLookup';
 import {
   createCategory,
   getCategory,
@@ -33,6 +34,8 @@ export default function CategoryEditorSheet() {
   const [health, setHealth] = useState<HealthLevel>(2);
   const [portionLabel, setPortionLabel] = useState('');
   const [nutrition, setNutrition] = useState<Nutrition>(EMPTY_NUTRITION);
+  /** Where the current values came from, shown until the user edits them. */
+  const [source, setSource] = useState<string>();
   const [error, setError] = useState<string>();
 
   useEffect(() => {
@@ -199,14 +202,42 @@ export default function CategoryEditorSheet() {
         <Text style={styles.label}>Nutrition per portion</Text>
         <TextInput
           value={portionLabel}
-          onChangeText={setPortionLabel}
+          onChangeText={(text) => {
+            setPortionLabel(text);
+            setSource(undefined);
+          }}
           placeholder="One portion is… e.g. 2 slices, 1 bowl"
           placeholderTextColor={colors.textTertiary}
           style={styles.input}
           maxLength={40}
           accessibilityLabel="Portion size"
         />
-        <NutritionFields value={nutrition} onChange={setNutrition} />
+        {/* Below the portion field: Ask AI asks about the portion typed above, Look up fills it in. */}
+        <NutritionLookup
+          foodName={name}
+          portionLabel={portionLabel}
+          onNeedName={() => setError('Enter the food’s name first, then look it up.')}
+          onApply={(result) => {
+            setPortionLabel(result.portionLabel);
+            setNutrition(result.nutrition);
+            setSource(result.source);
+          }}
+        />
+        <NutritionFields
+          value={nutrition}
+          onChange={(next) => {
+            setNutrition(next);
+            setSource(undefined);
+          }}
+        />
+        {source ? (
+          <View style={styles.source}>
+            <Icon ios="checkmark.circle.fill" android="check_circle" size={13} color={colors.health[2]} />
+            <Text style={styles.sourceText} numberOfLines={2}>
+              Filled from {source}. Adjust if needed.
+            </Text>
+          </View>
+        ) : null}
         <Text style={styles.hint}>
           {existing
             ? 'Used for foods you log from now on; days you already logged keep their values. Leave empty if unknown.'
@@ -311,6 +342,17 @@ const styles = StyleSheet.create({
   },
   emojiOptionText: {
     fontSize: 24,
+  },
+  source: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: -spacing.sm,
+  },
+  sourceText: {
+    flex: 1,
+    color: colors.textSecondary,
+    fontSize: 13,
   },
   hint: {
     color: colors.textTertiary,

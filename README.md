@@ -35,6 +35,16 @@ npm run db:generate   # after changing src/db/schema.ts
 
 Project structure and conventions are documented in [AGENTS.md](AGENTS.md).
 
+### Nutrition lookup key (optional)
+
+"Look up" in the category editor uses [USDA FoodData Central](https://fdc.nal.usda.gov/). Without a key it uses the shared demo key (about 10 lookups per hour). For regular use, get a free key at [api.data.gov/signup](https://api.data.gov/signup/) and put it in `.env.local`:
+
+```bash
+EXPO_PUBLIC_FDC_API_KEY=your-key-here
+```
+
+Restart `npm start` (and rebuild release APKs) after changing it.
+
 ## License
 
 [MIT](LICENSE)
