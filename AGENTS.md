@@ -40,6 +40,7 @@ Local-only (SQLite), no accounts, dark theme with Liquid Glass.
 - Portion stepper scales the current values (including hand-edited ones) in 0.5 steps. Tapping a logged food opens `entry/[id]` (edit amounts or remove).
 - Daily goals live in `daily_goals` as history (`effective_from`); a day uses the latest row on or before it. kcal and sugar are limits (max), fiber is a target (min); null = off. Progress shows on the home Today card.
 - Built-in nutrition values are approximate; `DEFAULT_CATEGORIES` feeds new installs and "Restore defaults", `drizzle/0003_nutrition_defaults.sql` filled existing installs.
+- Nutrition lookup in the category editor (`NutritionLookup`): **Look up** queries USDA FoodData Central (`src/services/usda.ts`; generic-food datasets only, 50 results ranked locally so "Pizza, …" beats "Dessert pizza", top 12 shown) and a tapped portion fills label + values. **Ask AI** opens Google AI Mode (`udm=50`) in an in-app browser; nothing is read back (no public API). No key → shared `DEMO_KEY` (~10 lookups/hour); set a free key as `EXPO_PUBLIC_FDC_API_KEY` in `.env.local` (git-ignored, inlined at build time).
 - Weeks start on Monday. UI language: English.
 - Planned later: monthly statistics (aggregate `entries` joined to `categories` by month with `levelFromAverage`).
 
