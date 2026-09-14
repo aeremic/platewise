@@ -15,6 +15,12 @@ import migrations from '../../drizzle/migrations';
 
 SplashScreen.preventAutoHideAsync();
 
+// When the app opens directly on another screen (a link, or the OS restoring the app), keep the
+// calendar underneath it so there's always a back button to the home screen.
+export const unstable_settings = {
+  anchor: 'index',
+};
+
 const navigationTheme = {
   ...DarkTheme,
   colors: {
