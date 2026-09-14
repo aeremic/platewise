@@ -1,10 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassButton, IconButton } from '@/components/glass/GlassButton';
 import { Icon } from '@/components/Icon';
+import { NutritionFields } from '@/components/nutrition/NutritionFields';
 import {
   createCategory,
   getCategory,
@@ -14,6 +15,7 @@ import {
 } from '@/data/categoriesRepo';
 import type { Category } from '@/db/schema';
 import { HEALTH_LABELS, HEALTH_LEVELS, type HealthLevel } from '@/domain/health';
+import { EMPTY_NUTRITION, type Nutrition } from '@/domain/nutrition';
 import { categoryEvents } from '@/lib/categoryEvents';
 import { FALLBACK_EMOJI, FOOD_EMOJIS } from '@/lib/emoji';
 import { haptics } from '@/lib/haptics';
@@ -29,6 +31,8 @@ export default function CategoryEditorSheet() {
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('');
   const [health, setHealth] = useState<HealthLevel>(2);
+  const [portionLabel, setPortionLabel] = useState('');
+  const [nutrition, setNutrition] = useState<Nutrition>(EMPTY_NUTRITION);
   const [error, setError] = useState<string>();
 
   useEffect(() => {
@@ -39,6 +43,8 @@ export default function CategoryEditorSheet() {
       setName(category.name);
       setEmoji(category.emoji ?? '');
       setHealth(category.health);
+      setPortionLabel(category.portionLabel ?? '');
+      setNutrition({ kcal: category.kcal, fiberG: category.fiberG, sugarG: category.sugarG });
     });
   }, [isNew, numericId]);
 
@@ -56,7 +62,7 @@ export default function CategoryEditorSheet() {
       return;
     }
 
-    const input = { name: trimmed, emoji, health };
+    const input = { name: trimmed, emoji, health, portionLabel, ...nutrition };
     if (existing) {
       await updateCategory(existing.id, input);
     } else {
@@ -87,8 +93,9 @@ export default function CategoryEditorSheet() {
   };
 
   return (
-    <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.xl }]}>
-      <View style={styles.topBar}>
+    <View style={styles.sheet}>
+      {/* Form sheet layout: exactly [header, ScrollView]; the header must not be flattened. */}
+      <View style={styles.topBar} collapsable={false}>
         <IconButton size={40} accessibilityLabel="Close" onPress={() => router.back()}>
           <Icon ios="xmark" android="close" size={16} />
         </IconButton>
@@ -102,94 +109,117 @@ export default function CategoryEditorSheet() {
         </GlassButton>
       </View>
 
-      <View style={styles.fields}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets>
+        <View style={styles.fields}>
+          <TextInput
+            value={emoji}
+            onChangeText={(text) => setEmoji(lastGrapheme(text))}
+            placeholder={FALLBACK_EMOJI}
+            placeholderTextColor={colors.textTertiary}
+            style={[styles.input, styles.emojiInput]}
+            accessibilityLabel="Emoji"
+          />
+          <TextInput
+            value={name}
+            onChangeText={(text) => {
+              setName(text);
+              setError(undefined);
+            }}
+            placeholder="Name, e.g. Sushi"
+            placeholderTextColor={colors.textTertiary}
+            style={[styles.input, styles.nameInput]}
+            autoFocus={isNew}
+            autoCapitalize="sentences"
+            returnKeyType="done"
+            onSubmitEditing={save}
+            maxLength={40}
+            accessibilityLabel="Name"
+          />
+        </View>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        {/* A wrapping grid rather than a horizontal ScrollView, which would confuse the sheet's scroll handling. */}
+        <View style={styles.emojiGrid}>
+          {FOOD_EMOJIS.map((option) => {
+            const selected = option === (emoji || FALLBACK_EMOJI);
+            return (
+              <Pressable
+                key={option}
+                accessibilityRole="button"
+                accessibilityLabel={`Use ${option}`}
+                accessibilityState={{ selected }}
+                onPress={() => {
+                  haptics.tap();
+                  setEmoji(option === FALLBACK_EMOJI ? '' : option);
+                }}
+                style={({ pressed }) => [styles.emojiCell, { transform: [{ scale: pressed ? 0.9 : 1 }] }]}>
+                <View style={[styles.emojiOption, selected && styles.emojiOptionSelected]}>
+                  <Text style={styles.emojiOptionText}>{option}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.label}>How healthy is it?</Text>
+        <View style={styles.levels}>
+          {HEALTH_LEVELS.map((level) => {
+            const selected = level === health;
+            const color = healthColor(level);
+            return (
+              <Pressable
+                key={level}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                accessibilityLabel={HEALTH_LABELS[level]}
+                onPress={() => {
+                  haptics.tap();
+                  setHealth(level);
+                }}
+                style={({ pressed }) => [
+                  styles.level,
+                  {
+                    borderColor: selected ? color : withAlpha(color, 0.3),
+                    backgroundColor: selected ? withAlpha(color, 0.28) : colors.glassFill,
+                    transform: [{ scale: pressed ? 0.96 : 1 }],
+                  },
+                  selected && { boxShadow: `0 0 16px ${withAlpha(color, 0.45)}` },
+                ]}>
+                <View style={[styles.levelDot, { backgroundColor: color }]} />
+                <Text style={styles.levelText}>{HEALTH_LABELS[level]}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.label}>Nutrition per portion</Text>
         <TextInput
-          value={emoji}
-          onChangeText={(text) => setEmoji(lastGrapheme(text))}
-          placeholder={FALLBACK_EMOJI}
+          value={portionLabel}
+          onChangeText={setPortionLabel}
+          placeholder="One portion is… e.g. 2 slices, 1 bowl"
           placeholderTextColor={colors.textTertiary}
-          style={[styles.input, styles.emojiInput]}
-          accessibilityLabel="Emoji"
-        />
-        <TextInput
-          value={name}
-          onChangeText={(text) => {
-            setName(text);
-            setError(undefined);
-          }}
-          placeholder="Name, e.g. Sushi"
-          placeholderTextColor={colors.textTertiary}
-          style={[styles.input, styles.nameInput]}
-          autoFocus={isNew}
-          autoCapitalize="sentences"
-          returnKeyType="done"
-          onSubmitEditing={save}
+          style={styles.input}
           maxLength={40}
-          accessibilityLabel="Name"
+          accessibilityLabel="Portion size"
         />
-      </View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+        <NutritionFields value={nutrition} onChange={setNutrition} />
+        <Text style={styles.hint}>
+          {existing
+            ? 'Used for foods you log from now on; days you already logged keep their values. Leave empty if unknown.'
+            : 'Leave a value empty if you don’t know it.'}
+        </Text>
 
-      {/* A plain grid, not a ScrollView: form sheets pin any ScrollView over their header. */}
-      <View style={styles.emojiGrid}>
-        {FOOD_EMOJIS.map((option) => {
-          const selected = option === (emoji || FALLBACK_EMOJI);
-          return (
-            <Pressable
-              key={option}
-              accessibilityRole="button"
-              accessibilityLabel={`Use ${option}`}
-              accessibilityState={{ selected }}
-              onPress={() => {
-                haptics.tap();
-                setEmoji(option === FALLBACK_EMOJI ? '' : option);
-              }}
-              style={({ pressed }) => [styles.emojiCell, { transform: [{ scale: pressed ? 0.9 : 1 }] }]}>
-              <View style={[styles.emojiOption, selected && styles.emojiOptionSelected]}>
-                <Text style={styles.emojiOptionText}>{option}</Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <Text style={styles.label}>How healthy is it?</Text>
-      <View style={styles.levels}>
-        {HEALTH_LEVELS.map((level) => {
-          const selected = level === health;
-          const color = healthColor(level);
-          return (
-            <Pressable
-              key={level}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              accessibilityLabel={HEALTH_LABELS[level]}
-              onPress={() => {
-                haptics.tap();
-                setHealth(level);
-              }}
-              style={({ pressed }) => [
-                styles.level,
-                {
-                  borderColor: selected ? color : withAlpha(color, 0.3),
-                  backgroundColor: selected ? withAlpha(color, 0.28) : colors.glassFill,
-                  transform: [{ scale: pressed ? 0.96 : 1 }],
-                },
-                selected && { boxShadow: `0 0 16px ${withAlpha(color, 0.45)}` },
-              ]}>
-              <View style={[styles.levelDot, { backgroundColor: color }]} />
-              <Text style={styles.levelText}>{HEALTH_LABELS[level]}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {existing ? (
-        <Pressable accessibilityRole="button" onPress={confirmRemove} style={styles.remove} hitSlop={8}>
-          <Icon ios="trash" android="delete" size={16} color={colors.destructive} />
-          <Text style={styles.removeText}>Remove category</Text>
-        </Pressable>
-      ) : null}
+        {existing ? (
+          <Pressable accessibilityRole="button" onPress={confirmRemove} style={styles.remove} hitSlop={8}>
+            <Icon ios="trash" android="delete" size={16} color={colors.destructive} />
+            <Text style={styles.removeText}>Remove category</Text>
+          </Pressable>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
@@ -206,14 +236,19 @@ function lastGrapheme(text: string): string {
 
 const styles = StyleSheet.create({
   sheet: {
-    paddingTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
+    flex: 1,
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  content: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
   },
   title: {
     ...type.headline,
@@ -276,6 +311,11 @@ const styles = StyleSheet.create({
   },
   emojiOptionText: {
     fontSize: 24,
+  },
+  hint: {
+    color: colors.textTertiary,
+    fontSize: 13,
+    marginTop: -spacing.sm,
   },
   error: {
     color: colors.destructive,

@@ -12,9 +12,12 @@ import { HealthDot } from '@/components/CategoryChip';
 import { Glass } from '@/components/glass/Glass';
 import { GlassButton, IconButton } from '@/components/glass/GlassButton';
 import { Icon } from '@/components/Icon';
+import { GoalProgress } from '@/components/nutrition/GoalProgress';
 import { getDaySummaries, getEntriesForDate } from '@/data/entriesRepo';
+import { getGoalsForDate } from '@/data/goalsRepo';
 import { gridRange, todayKey, type DateKey } from '@/domain/dates';
 import { HEALTH_LABELS, HEALTH_LEVELS, scoreDay } from '@/domain/health';
+import { sumNutrition } from '@/domain/nutrition';
 import { useLiveData } from '@/hooks/useLiveData';
 import { categoryEmoji } from '@/lib/emoji';
 import { haptics } from '@/lib/haptics';
@@ -39,6 +42,8 @@ export default function CalendarScreen() {
     today,
   );
   const todayLevel = scoreDay(todayEntries.map((e) => e.health));
+  const { data: todayGoals } = useLiveData(() => getGoalsForDate(today), ['daily_goals'], today);
+  const todayTotals = sumNutrition(todayEntries.map((e) => e.nutrition));
 
   const showMonth = (delta: 1 | -1) => {
     haptics.tap();
@@ -82,8 +87,8 @@ export default function CalendarScreen() {
         showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.brand}>Platewise</Text>
-          <IconButton accessibilityLabel="Edit categories" onPress={() => router.push('/categories')}>
-            <Icon ios="slider.horizontal.3" android="tune" />
+          <IconButton accessibilityLabel="Settings" onPress={() => router.push('/settings')}>
+            <Icon ios="gearshape" android="settings" />
           </IconButton>
         </View>
 
@@ -153,6 +158,7 @@ export default function CalendarScreen() {
             ) : (
               <Text style={styles.todayEmpty}>Nothing logged yet. What did you eat today?</Text>
             )}
+            {todayGoals ? <GoalProgress totals={todayTotals} goals={todayGoals} /> : null}
           </Glass>
         </Pressable>
       </ScrollView>
