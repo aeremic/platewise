@@ -14,20 +14,11 @@ const ORANGE_MIN = 0.75;
 
 /**
  * Maps an average health score (0–2) to a color level.
- * Shared by the calendar and (later) monthly statistics so they always agree.
+ * Used by `rateDay` (src/domain/dayRating.ts), which the calendar and statistics share.
  */
 export function levelFromAverage(average: number | null | undefined): HealthLevel | null {
   if (average == null || Number.isNaN(average)) return null;
   if (average >= GREEN_MIN) return 2;
   if (average >= ORANGE_MIN) return 1;
   return 0;
-}
-
-export function averageHealth(levels: readonly HealthLevel[]): number | null {
-  if (levels.length === 0) return null;
-  return levels.reduce<number>((sum, level) => sum + level, 0) / levels.length;
-}
-
-export function scoreDay(levels: readonly HealthLevel[]): HealthLevel | null {
-  return levelFromAverage(averageHealth(levels));
 }
