@@ -11,7 +11,7 @@ import { Glass } from '@/components/glass/Glass';
 import { GlassButton, IconButton } from '@/components/glass/GlassButton';
 import { Icon } from '@/components/Icon';
 import { AmountCard, type Amount } from '@/components/nutrition/AmountCard';
-import { RatingExplanation } from '@/components/rating/RatingExplanation';
+import { DayPreview } from '@/components/rating/DayPreview';
 import { getCategory, listActiveCategories, listRecentCategories } from '@/data/categoriesRepo';
 import { getGoalsForDate } from '@/data/goalsRepo';
 import { addEntries, getDaySummaries, getEntriesForDate } from '@/data/entriesRepo';
@@ -73,7 +73,13 @@ export default function DaySheet() {
   );
 
   const { data: dayGoals } = useLiveData(() => getGoalsForDate(date), ['daily_goals'], date);
-  const rating = dayGoals ? rateDay(logged, dayGoals) : null;
+  // Live preview: saved foods plus the ones being added, so color, reasons and goal bars update
+  // while choosing and adjusting portions. Nothing is stored until Save.
+  const previewFoods = [
+    ...logged,
+    ...drafts.map((d) => ({ name: d.category.name, health: d.category.health, portions: d.portions, nutrition: d.nutrition })),
+  ];
+  const rating = dayGoals ? rateDay(previewFoods, dayGoals) : null;
   const dayLevel = rating?.level ?? null;
   const day = fromDateKey(date);
   const isToday = date === todayKey();
@@ -227,7 +233,6 @@ export default function DaySheet() {
           ) : (
             <Text style={styles.empty}>Nothing logged for this day yet.</Text>
           )}
-          {rating ? <RatingExplanation rating={rating} /> : null}
           {logged.length > 0 ? <Text style={styles.hint}>Tap a food to change its amount or remove it.</Text> : null}
         </Animated.View>
 
@@ -247,6 +252,18 @@ export default function DaySheet() {
                 onRemove={() => toggle(draft.category)}
               />
             ))}
+          </Animated.View>
+        ) : null}
+
+        {rating && dayGoals ? (
+          <Animated.View layout={LinearTransition.duration(200)}>
+            <DayPreview
+              rating={rating}
+              goals={dayGoals}
+              unsavedLabel={
+                drafts.length > 0 ? `includes ${drafts.length} unsaved ${drafts.length === 1 ? 'food' : 'foods'}` : null
+              }
+            />
           </Animated.View>
         ) : null}
 
