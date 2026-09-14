@@ -2,7 +2,7 @@ import { addDays, addMonths, format, startOfMonth } from 'date-fns';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MonthGrid } from '@/components/calendar/MonthGrid';
@@ -204,7 +204,7 @@ export default function DaySheet() {
         ) : null}
 
         {/* Already logged */}
-        <Animated.View layout={LinearTransition.duration(200)} style={styles.section}>
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Logged</Text>
             {dayLevel != null ? (
@@ -234,11 +234,12 @@ export default function DaySheet() {
             <Text style={styles.empty}>Nothing logged for this day yet.</Text>
           )}
           {logged.length > 0 ? <Text style={styles.hint}>Tap a food to change its amount or remove it.</Text> : null}
-        </Animated.View>
+        </View>
 
-        {/* About to be logged */}
+        {/* About to be logged. No `layout` transitions on these sections: on Android they keep
+            siblings at their old positions, so this card overlapped the day preview. */}
         {drafts.length > 0 ? (
-          <Animated.View layout={LinearTransition.duration(200)} entering={FadeIn.duration(160)} style={styles.section}>
+          <Animated.View entering={FadeIn.duration(160)} style={styles.section}>
             <Text style={styles.sectionTitle}>Adding</Text>
             {drafts.map((draft) => (
               <AmountCard
@@ -256,7 +257,7 @@ export default function DaySheet() {
         ) : null}
 
         {rating && dayGoals ? (
-          <Animated.View layout={LinearTransition.duration(200)}>
+          <View>
             <DayPreview
               rating={rating}
               goals={dayGoals}
@@ -264,11 +265,11 @@ export default function DaySheet() {
                 drafts.length > 0 ? `includes ${drafts.length} unsaved ${drafts.length === 1 ? 'food' : 'foods'}` : null
               }
             />
-          </Animated.View>
+          </View>
         ) : null}
 
         {/* Add food */}
-        <Animated.View layout={LinearTransition.duration(200)} style={styles.section}>
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Add food</Text>
             <Pressable
@@ -346,7 +347,7 @@ export default function DaySheet() {
           {visibleCategories.length === 0 ? (
             <Text style={styles.empty}>No categories match “{query.trim()}”.</Text>
           ) : null}
-        </Animated.View>
+        </View>
       </ScrollView>
     </View>
   );
