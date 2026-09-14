@@ -1,4 +1,4 @@
-import { desc, lte } from 'drizzle-orm';
+import { asc, desc, lte } from 'drizzle-orm';
 
 import { db } from '@/db/client';
 import { dailyGoals } from '@/db/schema';
@@ -15,6 +15,17 @@ export async function getGoalsForDate(date: DateKey): Promise<Goals> {
     .limit(1);
   if (!row) return DEFAULT_GOALS;
   return { kcal: row.kcalMax, fiberG: row.fiberMin, sugarG: row.sugarMax };
+}
+
+export type GoalHistoryEntry = { effectiveFrom: DateKey; goals: Goals };
+
+/** Every goal change, oldest first; use with `goalsOn` to judge many days at once. */
+export async function listGoalHistory(): Promise<GoalHistoryEntry[]> {
+  const rows = await db.select().from(dailyGoals).orderBy(asc(dailyGoals.effectiveFrom));
+  return rows.map((row) => ({
+    effectiveFrom: row.effectiveFrom,
+    goals: { kcal: row.kcalMax, fiberG: row.fiberMin, sugarG: row.sugarMax },
+  }));
 }
 
 /**

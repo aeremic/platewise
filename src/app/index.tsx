@@ -13,10 +13,12 @@ import { Glass } from '@/components/glass/Glass';
 import { GlassButton, IconButton } from '@/components/glass/GlassButton';
 import { Icon } from '@/components/Icon';
 import { GoalProgress } from '@/components/nutrition/GoalProgress';
+import { RatingExplanation } from '@/components/rating/RatingExplanation';
 import { getDaySummaries, getEntriesForDate } from '@/data/entriesRepo';
 import { getGoalsForDate } from '@/data/goalsRepo';
 import { gridRange, todayKey, type DateKey } from '@/domain/dates';
-import { HEALTH_LABELS, HEALTH_LEVELS, scoreDay } from '@/domain/health';
+import { rateDay } from '@/domain/dayRating';
+import { HEALTH_LABELS, HEALTH_LEVELS } from '@/domain/health';
 import { sumNutrition } from '@/domain/nutrition';
 import { useLiveData } from '@/hooks/useLiveData';
 import { categoryEmoji } from '@/lib/emoji';
@@ -31,7 +33,7 @@ export default function CalendarScreen() {
   const { from, to } = gridRange(month);
   const { data: summaries } = useLiveData(
     () => getDaySummaries(from, to),
-    ['entries', 'categories'],
+    ['entries', 'categories', 'daily_goals'],
     `${from}:${to}`,
   );
 
@@ -41,8 +43,9 @@ export default function CalendarScreen() {
     ['entries', 'categories'],
     today,
   );
-  const todayLevel = scoreDay(todayEntries.map((e) => e.health));
   const { data: todayGoals } = useLiveData(() => getGoalsForDate(today), ['daily_goals'], today);
+  const todayRating = todayGoals ? rateDay(todayEntries, todayGoals) : null;
+  const todayLevel = todayRating?.level ?? null;
   const todayTotals = sumNutrition(todayEntries.map((e) => e.nutrition));
 
   const showMonth = (delta: 1 | -1) => {
@@ -158,6 +161,7 @@ export default function CalendarScreen() {
             ) : (
               <Text style={styles.todayEmpty}>Nothing logged yet. What did you eat today?</Text>
             )}
+            {todayRating ? <RatingExplanation rating={todayRating} compact /> : null}
             {todayGoals ? <GoalProgress totals={todayTotals} goals={todayGoals} /> : null}
           </Glass>
         </Pressable>

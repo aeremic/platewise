@@ -11,11 +11,14 @@ import { Glass } from '@/components/glass/Glass';
 import { GlassButton, IconButton } from '@/components/glass/GlassButton';
 import { Icon } from '@/components/Icon';
 import { AmountCard, type Amount } from '@/components/nutrition/AmountCard';
+import { RatingExplanation } from '@/components/rating/RatingExplanation';
 import { getCategory, listActiveCategories, listRecentCategories } from '@/data/categoriesRepo';
+import { getGoalsForDate } from '@/data/goalsRepo';
 import { addEntries, getDaySummaries, getEntriesForDate } from '@/data/entriesRepo';
 import type { Category } from '@/db/schema';
 import { fromDateKey, gridRange, isDateKey, todayKey, toDateKey, type DateKey } from '@/domain/dates';
-import { HEALTH_LABELS, HEALTH_LEVELS, scoreDay } from '@/domain/health';
+import { rateDay } from '@/domain/dayRating';
+import { HEALTH_LABELS, HEALTH_LEVELS } from '@/domain/health';
 import { formatPortions } from '@/domain/nutrition';
 import { useLiveData } from '@/hooks/useLiveData';
 import { categoryEvents } from '@/lib/categoryEvents';
@@ -65,11 +68,13 @@ export default function DaySheet() {
   const pickerRange = pickerMonth ? gridRange(pickerMonth) : null;
   const { data: pickerSummaries } = useLiveData(
     () => (pickerRange ? getDaySummaries(pickerRange.from, pickerRange.to) : Promise.resolve(undefined)),
-    ['entries', 'categories'],
+    ['entries', 'categories', 'daily_goals'],
     pickerRange ? `${pickerRange.from}:${pickerRange.to}` : 'closed',
   );
 
-  const dayLevel = scoreDay(logged.map((e) => e.health));
+  const { data: dayGoals } = useLiveData(() => getGoalsForDate(date), ['daily_goals'], date);
+  const rating = dayGoals ? rateDay(logged, dayGoals) : null;
+  const dayLevel = rating?.level ?? null;
   const day = fromDateKey(date);
   const isToday = date === todayKey();
 
@@ -222,6 +227,7 @@ export default function DaySheet() {
           ) : (
             <Text style={styles.empty}>Nothing logged for this day yet.</Text>
           )}
+          {rating ? <RatingExplanation rating={rating} /> : null}
           {logged.length > 0 ? <Text style={styles.hint}>Tap a food to change its amount or remove it.</Text> : null}
         </Animated.View>
 

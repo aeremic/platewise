@@ -1,16 +1,18 @@
-import { asc, between, eq, sql } from 'drizzle-orm';
+import { asc, between, eq } from 'drizzle-orm';
 
+import { listGoalHistory } from '@/data/goalsRepo';
 import { db } from '@/db/client';
 import { categories, entries } from '@/db/schema';
 import type { DateKey } from '@/domain/dates';
-import { levelFromAverage, type HealthLevel } from '@/domain/health';
+import { goalsOn, rateDay, type DayRating } from '@/domain/dayRating';
+import type { HealthLevel } from '@/domain/health';
 import { resolveEntryNutrition, type Nutrition } from '@/domain/nutrition';
 
 export type DaySummary = {
   date: DateKey;
   count: number;
-  average: number;
   level: HealthLevel;
+  rating: DayRating;
 };
 
 export type EntryWithCategory = {
@@ -29,27 +31,29 @@ export type EntryWithCategory = {
 };
 
 /**
- * One row per day that has entries. Health comes from the category's current color,
- * so recoloring a category also recolors past days.
+ * Rating for every day in the range that has entries (see `rateDay`), judged with the goals each
+ * day had. Health comes from the category's current color, so recoloring a category also
+ * recolors past days.
  */
 export async function getDaySummaries(from: DateKey, to: DateKey): Promise<Map<DateKey, DaySummary>> {
-  const rows = await db
-    .select({
-      date: entries.date,
-      count: sql<number>`count(*)`,
-      average: sql<number>`avg(${categories.health})`,
-    })
-    .from(entries)
-    .innerJoin(categories, eq(categories.id, entries.categoryId))
-    .where(between(entries.date, from, to))
-    .groupBy(entries.date);
+  const [rows, goalHistory] = await Promise.all([
+    selectEntries().where(between(entries.date, from, to)),
+    listGoalHistory(),
+  ]);
 
-  const byDate = new Map<DateKey, DaySummary>();
-  for (const row of rows) {
-    const level = levelFromAverage(row.average);
-    if (level != null) byDate.set(row.date, { ...row, level });
+  const byDate = new Map<DateKey, EntryWithCategory[]>();
+  for (const entry of rows.map(toEntry)) {
+    const day = byDate.get(entry.date);
+    if (day) day.push(entry);
+    else byDate.set(entry.date, [entry]);
   }
-  return byDate;
+
+  const summaries = new Map<DateKey, DaySummary>();
+  for (const [date, dayEntries] of byDate) {
+    const rating = rateDay(dayEntries, goalsOn(goalHistory, date));
+    if (rating) summaries.set(date, { date, count: dayEntries.length, level: rating.level, rating });
+  }
+  return summaries;
 }
 
 const entryColumns = {
