@@ -1,7 +1,7 @@
 import { addDays, addMonths, format, startOfMonth } from 'date-fns';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, type LayoutChangeEvent } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -53,8 +53,32 @@ export default function DaySheet() {
   const { data: categories = [] } = useLiveData(listActiveCategories, ['categories'], 'active');
   const { data: recent = [] } = useLiveData(() => listRecentCategories(), ['entries', 'categories'], 'recent');
 
-  const addDraft = (category: Category) =>
+  // After a food is added, bring its card into view so its amount can be adjusted right away:
+  // back to the very top if the card is visible from there, otherwise just far enough that the
+  // card sits at the top. Runs from the card's first layout, once its final position is known.
+  const scrollRef = useRef<ScrollView>(null);
+  const contentRef = useRef<View>(null);
+  const viewportHeight = useRef(0);
+  const cardRefs = useRef(new Map<number, View>());
+  const scrollToCard = useRef<number | null>(null);
+
+  const revealAddedCard = (categoryId: number) => {
+    if (scrollToCard.current !== categoryId) return;
+    scrollToCard.current = null;
+    const card = cardRefs.current.get(categoryId);
+    const content = contentRef.current;
+    if (!card || !content) return;
+    card.measureLayout(content, (_x, y, _width, height) => {
+      const margin = spacing.md;
+      const visibleFromTop = y + height + margin <= viewportHeight.current;
+      scrollRef.current?.scrollTo({ y: visibleFromTop ? 0 : Math.max(0, y - margin), animated: true });
+    });
+  };
+
+  const addDraft = (category: Category) => {
+    scrollToCard.current = category.id;
     setDrafts((ds) => (ds.some((d) => d.category.id === category.id) ? ds : [...ds, draftFor(category)]));
+  };
 
   // A category created from this sheet's "New category" link is selected right away.
   useEffect(
@@ -99,11 +123,11 @@ export default function DaySheet() {
 
   const toggle = (category: Category) => {
     haptics.tap();
-    setDrafts((ds) =>
-      ds.some((d) => d.category.id === category.id)
-        ? ds.filter((d) => d.category.id !== category.id)
-        : [...ds, draftFor(category)],
-    );
+    if (selectedIds.includes(category.id)) {
+      setDrafts((ds) => ds.filter((d) => d.category.id !== category.id));
+    } else {
+      addDraft(category);
+    }
   };
 
   const updateDraft = (categoryId: number, amount: Amount) =>
@@ -143,6 +167,12 @@ export default function DaySheet() {
           ScrollView takes part in nested scrolling; without it every downward drag of the
           expanded sheet dismisses it, even when the list is scrolled down. */}
       <ScrollView
+        ref={scrollRef}
+        // RN's typings want a non-null RefObject; the ref is null only before mount.
+        innerViewRef={contentRef as RefObject<View>}
+        onLayout={(e: LayoutChangeEvent) => {
+          viewportHeight.current = e.nativeEvent.layout.height;
+        }}
         nestedScrollEnabled
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
         keyboardShouldPersistTaps="handled"
@@ -246,16 +276,24 @@ export default function DaySheet() {
           <Animated.View entering={FadeIn.duration(160)} style={styles.section}>
             <Text style={styles.sectionTitle}>Adding</Text>
             {drafts.map((draft) => (
-              <AmountCard
+              <View
                 key={draft.category.id}
-                name={draft.category.name}
-                emoji={draft.category.emoji}
-                health={draft.category.health}
-                portionLabel={draft.category.portionLabel}
-                amount={draft}
-                onChange={(amount) => updateDraft(draft.category.id, amount)}
-                onRemove={() => toggle(draft.category)}
-              />
+                collapsable={false}
+                ref={(node) => {
+                  if (node) cardRefs.current.set(draft.category.id, node);
+                  else cardRefs.current.delete(draft.category.id);
+                }}
+                onLayout={() => revealAddedCard(draft.category.id)}>
+                <AmountCard
+                  name={draft.category.name}
+                  emoji={draft.category.emoji}
+                  health={draft.category.health}
+                  portionLabel={draft.category.portionLabel}
+                  amount={draft}
+                  onChange={(amount) => updateDraft(draft.category.id, amount)}
+                  onRemove={() => toggle(draft.category)}
+                />
+              </View>
             ))}
           </Animated.View>
         ) : null}
