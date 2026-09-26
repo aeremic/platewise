@@ -61,6 +61,11 @@ Local-only (SQLite), no accounts, dark theme with Liquid Glass.
 - Don't make `GlassView` `isInteractive` inside a `Pressable`: native interactive glass swallows the first tap.
 - Screens with `headerLargeTitle` must have the ScrollView as the root view (no wrapper), otherwise the title never collapses. Put decorative backgrounds inside the ScrollView.
 
+## Android gotchas (found on device)
+
+- Form sheets are Material `BottomSheetBehavior`, which only lets content scroll first if a view has Android nested scrolling enabled. Give every sheet's vertical ScrollView a static `nestedScrollEnabled` (present from the first render); without it any pull-down on the expanded sheet drags/dismisses it instead of scrolling back up. Never set it on a horizontal ScrollView inside a sheet (it would become the sheet's scrolling child). The prop is Android-only, so iOS is unaffected.
+- Reanimated `layout` transitions on sections inside the day sheet left siblings at stale positions on Android (overlapping cards); use plain Views there.
+
 ## Checks
 
 `npm run typecheck`, `npm run lint`, `npm test`.

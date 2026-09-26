@@ -112,7 +112,10 @@ export default function CategoryEditorSheet() {
         </GlassButton>
       </View>
 
+      {/* nestedScrollEnabled: without it Android dismisses the sheet on any downward drag
+          instead of scrolling the content back up (see day.tsx). */}
       <ScrollView
+        nestedScrollEnabled
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"

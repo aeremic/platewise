@@ -139,7 +139,11 @@ export default function DaySheet() {
         </GlassButton>
       </View>
 
+      {/* nestedScrollEnabled: on Android the sheet only lets its content scroll first if the
+          ScrollView takes part in nested scrolling; without it every downward drag of the
+          expanded sheet dismisses it, even when the list is scrolled down. */}
       <ScrollView
+        nestedScrollEnabled
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag">
