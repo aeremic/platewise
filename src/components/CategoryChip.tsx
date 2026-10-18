@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { HealthLevel } from '@/domain/health';
+import { HEALTH_LABELS, type HealthLevel } from '@/domain/health';
 import { categoryEmoji } from '@/lib/emoji';
 import { colors, healthColor, withAlpha } from '@/theme';
 
@@ -30,7 +30,8 @@ export function CategoryChip({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? name}
+      // The health color is only visual, so screen readers hear it as a word.
+      accessibilityLabel={`${accessibilityLabel ?? name}, ${HEALTH_LABELS[health].toLowerCase()}`}
       accessibilityState={{ selected }}
       onPress={onPress}
       style={({ pressed }) => [

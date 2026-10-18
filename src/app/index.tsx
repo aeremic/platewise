@@ -16,19 +16,28 @@ import { GoalProgress } from '@/components/nutrition/GoalProgress';
 import { RatingExplanation } from '@/components/rating/RatingExplanation';
 import { getDaySummaries, getEntriesForDate } from '@/data/entriesRepo';
 import { getGoalsForDate } from '@/data/goalsRepo';
-import { gridRange, todayKey, type DateKey } from '@/domain/dates';
+import { fromDateKey, gridRange, type DateKey } from '@/domain/dates';
 import { rateDay } from '@/domain/dayRating';
 import { HEALTH_LABELS, HEALTH_LEVELS } from '@/domain/health';
 import { sumNutrition } from '@/domain/nutrition';
 import { useLiveData } from '@/hooks/useLiveData';
+import { useTodayKey } from '@/hooks/useTodayKey';
 import { categoryEmoji } from '@/lib/emoji';
 import { haptics } from '@/lib/haptics';
 import { colors, healthColor, spacing, type } from '@/theme';
 
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
-  const [month, setMonth] = useState(() => startOfMonth(new Date()));
+  const today = useTodayKey();
+  const [month, setMonth] = useState(() => startOfMonth(fromDateKey(today)));
   const [direction, setDirection] = useState<1 | -1>(1);
+
+  // If the day rolls over into a new month while the current month is shown, follow it.
+  const [shownToday, setShownToday] = useState(today);
+  if (shownToday !== today) {
+    setShownToday(today);
+    if (isSameMonth(month, fromDateKey(shownToday))) setMonth(startOfMonth(fromDateKey(today)));
+  }
 
   const { from, to } = gridRange(month);
   const { data: summaries } = useLiveData(
@@ -37,7 +46,6 @@ export default function CalendarScreen() {
     `${from}:${to}`,
   );
 
-  const today = todayKey();
   const { data: todayEntries = [] } = useLiveData(
     () => getEntriesForDate(today),
     ['entries', 'categories'],
@@ -55,7 +63,7 @@ export default function CalendarScreen() {
   };
   const goToCurrentMonth = () => {
     haptics.tap();
-    const current = startOfMonth(new Date());
+    const current = startOfMonth(fromDateKey(today));
     setDirection(current > month ? 1 : -1);
     setMonth(current);
   };
@@ -74,7 +82,7 @@ export default function CalendarScreen() {
       .onEnd(() => showMonth(-1)),
   );
 
-  const isCurrentMonth = isSameMonth(month, new Date());
+  const isCurrentMonth = isSameMonth(month, fromDateKey(today));
   const monthKey = format(month, 'yyyy-MM');
 
   return (
@@ -98,8 +106,12 @@ export default function CalendarScreen() {
         <GestureDetector gesture={swipe}>
           <Glass radius={32} style={styles.calendarCard}>
             <View style={styles.monthRow}>
-              <Animated.View key={monthKey} entering={(direction > 0 ? FadeInRight : FadeInLeft).duration(220)}>
-                <Text style={styles.monthTitle}>
+              <Animated.View
+                key={monthKey}
+                entering={(direction > 0 ? FadeInRight : FadeInLeft).duration(220)}
+                style={styles.monthTitleWrap}>
+                {/* Shrinks instead of pushing the buttons off a small screen ("September 2026" + Today). */}
+                <Text style={styles.monthTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {format(month, 'MMMM')} <Text style={styles.yearTitle}>{format(month, 'yyyy')}</Text>
                 </Text>
               </Animated.View>
@@ -122,7 +134,7 @@ export default function CalendarScreen() {
             </View>
 
             <Animated.View key={monthKey} entering={(direction > 0 ? FadeInRight : FadeInLeft).duration(220)}>
-              <MonthGrid month={month} summaries={summaries} onSelectDay={openDay} />
+              <MonthGrid month={month} today={today} summaries={summaries} onSelectDay={openDay} />
             </Animated.View>
 
             <View style={styles.legend}>
@@ -138,14 +150,23 @@ export default function CalendarScreen() {
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Open today"
+          accessibilityLabel={[
+            `Today, ${format(fromDateKey(today), 'EEEE, MMMM d')}`,
+            todayLevel != null ? HEALTH_LABELS[todayLevel] : null,
+            todayEntries.length > 0
+              ? `${todayEntries.length} ${todayEntries.length === 1 ? 'food' : 'foods'} logged`
+              : 'nothing logged yet',
+          ]
+            .filter(Boolean)
+            .join(', ')}
+          accessibilityHint="Opens today's food log"
           onPress={() => openDay(today)}
           style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}>
           <Glass radius={28} style={styles.todayCard}>
             <View style={styles.todayHeader}>
-              <View>
+              <View style={styles.todayHeading}>
                 <Text style={styles.overline}>Today</Text>
-                <Text style={styles.todayDate}>{format(new Date(), 'EEEE, MMMM d')}</Text>
+                <Text style={styles.todayDate}>{format(fromDateKey(today), 'EEEE, MMMM d')}</Text>
               </View>
               {todayLevel != null ? (
                 <View style={[styles.levelPill, { borderColor: healthColor(todayLevel) }]}>
@@ -203,7 +224,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing.sm,
     marginBottom: spacing.xs,
+  },
+  monthTitleWrap: {
+    flexShrink: 1,
   },
   monthTitle: {
     ...type.title,
@@ -219,7 +244,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   todayPill: {
-    height: 36,
+    minHeight: 36,
     paddingHorizontal: spacing.md,
   },
   todayPillText: {
@@ -251,6 +276,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.sm,
+  },
+  todayHeading: {
+    flex: 1,
   },
   overline: {
     ...type.overline,
@@ -290,7 +319,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fab: {
-    height: 60,
+    minHeight: 60,
     paddingHorizontal: 28,
     gap: spacing.sm,
   },

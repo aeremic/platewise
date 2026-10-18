@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import type { HealthLevel } from '@/domain/health';
 
 export const colors = {
@@ -40,3 +42,17 @@ export function withAlpha(hex: string, alpha: number): string {
 export function healthColor(level: HealthLevel): string {
   return colors.health[level];
 }
+
+/**
+ * Spread onto every TextInput: accent caret and selection instead of the system default
+ * (Android otherwise uses the stock teal/green accent and an underline).
+ */
+export const textInputColors = Platform.select({
+  android: {
+    cursorColor: colors.accent,
+    selectionHandleColor: colors.accent,
+    selectionColor: withAlpha(colors.accent, 0.35),
+    underlineColorAndroid: 'transparent',
+  },
+  default: { selectionColor: colors.accent },
+});

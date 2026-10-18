@@ -35,15 +35,31 @@ npm run db:generate   # after changing src/db/schema.ts
 
 Project structure and conventions are documented in [AGENTS.md](AGENTS.md).
 
-### Nutrition lookup key (optional)
+### USDA nutrition lookup (disabled)
 
-"Look up" in the category editor uses [USDA FoodData Central](https://fdc.nal.usda.gov/). Without a key it uses the shared demo key (about 10 lookups per hour). For regular use, get a free key at [api.data.gov/signup](https://api.data.gov/signup/) and put it in `.env.local`:
+"Look up" in the category editor (USDA FoodData Central) is **turned off** until the app has an official api.data.gov key. "Ask AI" (Google AI Mode) works without a key. To try Look up locally, set both variables in `.env.local` and restart `npm start`:
 
 ```bash
+EXPO_PUBLIC_USDA_LOOKUP=enabled
 EXPO_PUBLIC_FDC_API_KEY=your-key-here
 ```
 
-Restart `npm start` (and rebuild release APKs) after changing it.
+Never ship a personal key in a store build. See `src/config/app.ts`.
+
+## Releasing
+
+Store builds are made with [EAS Build](https://docs.expo.dev/build/introduction/) (`eas.json`) and uploaded with EAS Submit.
+
+```bash
+npm run release:check            # placeholders, USDA switch, identifiers
+node scripts/check-store-text.mjs # store text character limits
+eas build --platform all --profile production
+```
+
+- App ID: `com.aeremic.platewise` (iOS and Android).
+- Public website, privacy policy and support page: `docs/` (GitHub Pages).
+- Store texts, answers for the privacy/data-safety forms and graphics: `store/`.
+- Step-by-step owner checklist: [RELEASE_PLAN.md](RELEASE_PLAN.md).
 
 ## License
 

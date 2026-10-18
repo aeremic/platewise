@@ -1,8 +1,9 @@
-import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/Icon';
+import { USDA_LOOKUP_ENABLED } from '@/config/app';
 import type { Nutrition } from '@/domain/nutrition';
 import { haptics } from '@/lib/haptics';
 import { askAiUrl, nutritionForPortion, searchUsdaFoods, UsdaError, type UsdaFood, type UsdaPortion } from '@/services/usda';
@@ -31,7 +32,10 @@ type State =
   | { status: 'results'; foods: UsdaFood[]; query: string }
   | { status: 'error'; message: string };
 
-/** "Look up" (USDA database, autofills) and "Ask AI" (Google AI Mode in an in-app browser). */
+/**
+ * "Ask AI" (Google AI Mode in the system browser), plus "Look up" (USDA database, autofills) when
+ * USDA_LOOKUP_ENABLED is on.
+ */
 export function NutritionLookup({ foodName, portionLabel, onApply, onNeedName }: Props) {
   const [state, setState] = useState<State>({ status: 'idle' });
   const abort = useRef<AbortController | null>(null);
@@ -62,12 +66,9 @@ export function NutritionLookup({ foodName, portionLabel, onApply, onNeedName }:
   const askAi = () => {
     if (!name) return onNeedName();
     haptics.tap();
-    void WebBrowser.openBrowserAsync(askAiUrl(name, portionLabel), {
-      presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-      controlsColor: colors.accent,
-      toolbarColor: colors.sheetBackground,
-      dismissButtonStyle: 'done',
-    });
+    // The system browser, not an in-app one: an in-app browser on a search page counts as
+    // "Unrestricted Web Access" in the App Store age rating (16+).
+    void Linking.openURL(askAiUrl(name, portionLabel));
   };
 
   const apply = (food: UsdaFood, portion: UsdaPortion) => {
@@ -79,12 +80,14 @@ export function NutritionLookup({ foodName, portionLabel, onApply, onNeedName }:
   return (
     <View style={styles.container}>
       <View style={styles.buttons}>
-        <LookupButton
-          icon={<Icon ios="magnifyingglass" android="search" size={16} color={colors.accent} />}
-          title="Look up"
-          subtitle="Fill from food database"
-          onPress={lookUp}
-        />
+        {USDA_LOOKUP_ENABLED ? (
+          <LookupButton
+            icon={<Icon ios="magnifyingglass" android="search" size={16} color={colors.accent} />}
+            title="Look up"
+            subtitle="Fill from food database"
+            onPress={lookUp}
+          />
+        ) : null}
         <LookupButton
           icon={<Icon ios="sparkles" android="auto_awesome" size={16} color={colors.accent} />}
           title="Ask AI"

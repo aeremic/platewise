@@ -1,8 +1,9 @@
+import { format } from 'date-fns';
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { DaySummary } from '@/data/entriesRepo';
-import { monthGrid, todayKey, weekdayLabels, type CalendarDay, type DateKey } from '@/domain/dates';
+import { fromDateKey, monthGrid, weekdayLabels, type CalendarDay, type DateKey } from '@/domain/dates';
 import { HEALTH_LABELS } from '@/domain/health';
 import { colors, healthColor, withAlpha } from '@/theme';
 
@@ -13,17 +14,19 @@ type Props = {
   selectedKey?: DateKey;
   onSelectDay: (key: DateKey) => void;
   compact?: boolean;
+  /** From `useTodayKey()`, so the highlight moves at midnight (a default would be cached by the compiler). */
+  today: DateKey;
 };
 
-export function MonthGrid({ month, summaries, selectedKey, onSelectDay, compact = false }: Props) {
+export function MonthGrid({ month, summaries, selectedKey, onSelectDay, compact = false, today }: Props) {
   const weeks = monthGrid(month);
-  const today = todayKey();
 
   return (
     <View>
-      <View style={styles.row}>
+      {/* Single letters are noise for screen readers; each day's label names its weekday. */}
+      <View style={styles.row} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         {weekdayLabels().map((label, i) => (
-          <Text key={i} style={styles.weekday}>
+          <Text key={i} style={styles.weekday} maxFontSizeMultiplier={1.3}>
             {label}
           </Text>
         ))}
@@ -68,7 +71,7 @@ const DayCell = memo(function DayCell({
   const color = summary ? healthColor(summary.level) : undefined;
 
   const label = [
-    day.key,
+    format(fromDateKey(day.key), 'EEEE, MMMM d'),
     isToday ? 'today' : null,
     summary ? `${HEALTH_LABELS[summary.level]}, ${summary.count} logged` : 'nothing logged',
   ]
@@ -98,6 +101,7 @@ const DayCell = memo(function DayCell({
           isSelected && styles.selected,
         ]}>
         <Text
+          maxFontSizeMultiplier={1.3}
           style={[
             styles.dayText,
             compact && styles.dayTextCompact,

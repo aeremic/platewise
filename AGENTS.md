@@ -25,6 +25,11 @@ Local-only (SQLite), no accounts, dark theme with Liquid Glass.
 - `src/app/` routes: `index` (calendar), `day` (form sheet: log/remove entries for a date, `?date=YYYY-MM-DD`), `categories/index`, `categories/[id]` (form sheet; `id=new` to create).
 - `src/domain/` pure logic with unit tests (`npm test`). `health.ts` holds the day-color rule; reuse it for monthly stats.
 - `src/data/` all database access. Screens read through `useLiveData` (`src/hooks/useLiveData.ts`), which re-queries when listed tables change.
+- Writes from screens (Save / Remove) go through `useGuardedAction` (`src/hooks/useGuardedAction.ts`): one run at a time (no double inserts on a fast double tap), an alert instead of a silent failure, and `pending` to disable the button.
+- "Today" comes from `useTodayKey()` (`src/hooks/useTodayKey.ts`), not `todayKey()` in render, so screens roll over at midnight and when the app returns from the background.
+- Unexpected render errors land in the root `ErrorBoundary` (`src/app/_layout.tsx` → `ErrorScreen`, with retry and a support email); startup/migration errors use the same screen.
+- Every `TextInput` spreads `textInputColors` from `src/theme` (accent caret/selection, no Android underline). Native Android dialogs get the accent via `plugins/withAndroidAccentColor.js` (`colorAccent`; needs prebuild).
+- Screen-reader labels: color is never the only signal — chips and calendar days say the health level in words; calendar days read as "Wednesday, October 7".
 
 ## Decisions
 
@@ -43,9 +48,21 @@ Local-only (SQLite), no accounts, dark theme with Liquid Glass.
 - Portion stepper scales the current values (including hand-edited ones) in 0.5 steps. Tapping a logged food opens `entry/[id]` (edit amounts or remove).
 - Daily goals live in `daily_goals` as history (`effective_from`); a day uses the latest row on or before it. kcal and sugar are limits (max), fiber is a target (min); null = off. Progress shows on the home Today card; goals also adjust day colors (see above). Any query feeding day colors must list `daily_goals` in `useLiveData` tables.
 - Built-in nutrition values are approximate; `DEFAULT_CATEGORIES` feeds new installs and "Restore defaults", `drizzle/0003_nutrition_defaults.sql` filled existing installs.
-- Nutrition lookup in the category editor (`NutritionLookup`): **Look up** queries USDA FoodData Central (`src/services/usda.ts`; generic-food datasets only, 50 results ranked locally so "Pizza, …" beats "Dessert pizza", top 12 shown) and a tapped portion fills label + values. **Ask AI** opens Google AI Mode (`udm=50`) in an in-app browser; nothing is read back (no public API). No key → shared `DEMO_KEY` (~10 lookups/hour); set a free key as `EXPO_PUBLIC_FDC_API_KEY` in `.env.local` (git-ignored, inlined at build time).
+- Nutrition lookup in the category editor (`NutritionLookup`): **Look up** queries USDA FoodData Central (`src/services/usda.ts`; generic-food datasets only, 50 results ranked locally so "Pizza, …" beats "Dessert pizza", top 12 shown) and a tapped portion fills label + values. **Ask AI** opens Google AI Mode (`udm=50`) in the system browser (not an in-app one: that would count as "Unrestricted Web Access", App Store age rating 16+); nothing is read back (no public API). **Look up is disabled for release** (`USDA_LOOKUP_ENABLED` in `src/config/app.ts`): it only appears when the build has `EXPO_PUBLIC_USDA_LOOKUP=enabled` and `EXPO_PUBLIC_FDC_API_KEY`. No DEMO_KEY fallback; never ship a personal key. When enabling it, update `docs/privacy.html` (food names are then sent to USDA) and the store privacy answers.
 - Weeks start on Monday. UI language: English.
 - Planned later: monthly statistics — reuse `getDaySummaries` / `rateDay` per day so stats and calendar agree.
+
+## Release
+
+- App ID `com.aeremic.platewise` on both stores (Play package name can never change). Versions: `expo.version` in app.json; build numbers are managed remotely by EAS (`appVersionSource: remote`, `autoIncrement`).
+- Public info lives in `src/config/app.ts` (support email, website, privacy URL) and is shown in Settings → About, which also carries the "not medical advice" disclaimer required for health apps.
+- `docs/` is the GitHub Pages site (index = support/FAQ, privacy.html). `store/` holds listing texts (`check-store-text.mjs` validates limits), form answers, graphics and screenshots. `npm run release:check` fails on the placeholder support email and on any USDA variable in the shell or `.env*` files (EAS server variables must be checked with `eas env:list`).
+- Signing/submit secrets never go in the repo (it is public for GitHub Pages): `credentials.json`, `credentials/` and `*service-account*.json` are git-ignored. Keep the default EAS build image for SDK 57; read the SDK changelog before pinning another `image`.
+- iOS copy must not name other mobile platforms (App Review 2.3.10): the iOS backup text and App Store description stay platform-neutral; Android/Play copy may say "iPhone".
+- Screenshots use demo data: `node scripts/make-demo-backup.mts YYYY-MM-DD > demo.json`, then Settings → Backup → Import on a fresh simulator/emulator. iOS: iPhone 17 Pro Max simulator (1320×2868) with `xcrun simctl status_bar … override`. Android: Pixel 9 emulator in SystemUI demo mode, captured at 1080×2424 and framed onto 1080×1920 (9:16, Play's size for recommendations). Both stores reject alpha channels: run every store image through `swift scripts/store-image.swift <in> <out> [WxH]`. Files: `store/screenshots/{ios,android}/`.
+- Health disclaimers: Play requires "not a medical device … consult a healthcare professional" in the description (in `store/listing.md`); Apple's age rating is at least 9+ (Health or Wellness Topics = Yes); the built-in "Alcohol" category is an alcohol reference for both rating questionnaires (see `store/forms.md`).
+- Android form sheets don't move for the keyboard at a full-height detent and `automaticallyAdjustKeyboardInsets` is iOS-only: sheet ScrollViews with inputs use `useAndroidKeyboardInset(scrollRef)` (extra bottom padding + scroll the focused field above the keyboard).
+- The app never shows web pages itself: Ask AI and the About links open the system browser (an in-app browser that can reach any page = "Unrestricted Web Access" = App Store 16+). `expo-web-browser` was removed for that reason. Store privacy answers ("Data not collected") depend on the app never sending data itself; adding analytics, crash reporting or a server changes `docs/privacy.html` and `store/forms.md`.
 
 ## Backup (Settings → Backup)
 
@@ -57,7 +74,7 @@ Local-only (SQLite), no accounts, dark theme with Liquid Glass.
 
 ## iOS gotchas (found on device)
 
-- Form sheet with a ScrollView: the sheet expects exactly `[header, ScrollView]` — give the header `collapsable={false}` or the ScrollView covers it. A `fitToContents` sheet must not contain any ScrollView (even a horizontal one); use wrapping grids instead.
+- Form sheet with a ScrollView: the sheet expects exactly `[header, ScrollView]` — give the header `collapsable={false}` or the ScrollView covers it. A `fitToContents` sheet must not contain any ScrollView (even a horizontal one); use wrapping grids instead. All current sheets use fixed detents (`[1]`, day sheet `[0.7, 1]`) with a ScrollView, so content can't be cut off on small screens or under the keyboard.
 - Don't make `GlassView` `isInteractive` inside a `Pressable`: native interactive glass swallows the first tap.
 - Screens with `headerLargeTitle` must have the ScrollView as the root view (no wrapper), otherwise the title never collapses. Put decorative backgrounds inside the ScrollView.
 

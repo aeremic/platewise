@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { parseAmount } from '@/domain/nutrition';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, textInputColors } from '@/theme';
 
 type Props = {
   label: string;
@@ -31,6 +31,7 @@ export function NumberField({ label, unit, value, onChange, editable = true, acc
       </Text>
       <View style={styles.inputRow}>
         <TextInput
+          {...textInputColors}
           value={text}
           editable={editable}
           onChangeText={(next) => {

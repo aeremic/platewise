@@ -1,11 +1,12 @@
-// Generates Platewise's app icon, Android adaptive icon layers, splash image and the
-// layers of the iOS 26 Icon Composer bundle.
+// Generates Platewise's app icon, Android adaptive icon layers, splash image, the
+// layers of the iOS 26 Icon Composer bundle, and the Google Play store graphics.
 //
 //   swift scripts/generate-icons.swift
 //
 // The logo is a plate whose rim is a ring of green / orange / red arcs (a tiny "health chart").
 
 import CoreGraphics
+import CoreText
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
@@ -184,3 +185,65 @@ try FileManager.default.createDirectory(at: assets, withIntermediateDirectories:
 try ringSVG.write(to: assets.appendingPathComponent("ring.svg"), atomically: true, encoding: .utf8)
 try plateSVG.write(to: assets.appendingPathComponent("plate.svg"), atomically: true, encoding: .utf8)
 print("wrote assets/platewise.icon/Assets/{ring,plate}.svg")
+
+// MARK: - Google Play store graphics (store/graphics)
+
+let storeGraphics = root.appendingPathComponent("store/graphics")
+try FileManager.default.createDirectory(at: storeGraphics, withIntermediateDirectories: true)
+
+/// Opaque canvas: Play rejects store graphics with an alpha channel.
+func makeContext(width: Int, height: Int) -> CGContext {
+  let ctx = CGContext(
+    data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+    space: CGColorSpace(name: CGColorSpace.sRGB)!,
+    bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+  ctx.translateBy(x: 0, y: CGFloat(height))
+  ctx.scaleBy(x: 1, y: -1)
+  return ctx
+}
+
+/// Draws one line of text with its baseline at `y` (y-down canvas).
+func drawText(_ ctx: CGContext, _ text: String, x: Double, y: Double, size: Double, bold: Bool, alpha: Double) {
+  var font = CTFontCreateUIFontForLanguage(.system, size, nil)!
+  if bold, let b = CTFontCreateCopyWithSymbolicTraits(font, size, nil, .traitBold, .traitBold) { font = b }
+  let attributes: [NSAttributedString.Key: Any] = [
+    NSAttributedString.Key(kCTFontAttributeName as String): font,
+    NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(gray: 1, alpha: alpha),
+  ]
+  let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attributes))
+  ctx.saveGState()
+  // CoreText draws y-up; flip locally around the baseline.
+  ctx.translateBy(x: x, y: y)
+  ctx.scaleBy(x: 1, y: -1)
+  ctx.textPosition = .zero
+  CTLineDraw(line, ctx)
+  ctx.restoreGState()
+}
+
+// 512 × 512 high-res icon (Play Console → Main store listing → App icon).
+do {
+  let ctx = makeContext(512)
+  drawBackground(ctx, size: 512)
+  drawLogo(ctx, size: 512, scale: 1, style: .color, glow: true)
+  writePNG(ctx, to: storeGraphics.appendingPathComponent("play-icon-512.png"))
+}
+
+// 1024 × 500 feature graphic (required by Play). Logo left, name and tagline right.
+do {
+  let width = 1024, height = 500
+  let ctx = makeContext(width: width, height: height)
+  // Reuse the icon background, stretched to the banner.
+  ctx.saveGState()
+  ctx.scaleBy(x: 1, y: Double(height) / Double(width))
+  drawBackground(ctx, size: Double(width))
+  ctx.restoreGState()
+  // Logo: a 1024-canvas logo scaled to ~420 px, centered vertically at x ≈ 250.
+  ctx.saveGState()
+  ctx.translateBy(x: 250 - 210, y: 250 - 210)
+  drawLogo(ctx, size: 420, scale: 1, style: .color, glow: true)
+  ctx.restoreGState()
+  drawText(ctx, "Platewise", x: 480, y: 235, size: 96, bold: true, alpha: 1)
+  drawText(ctx, "Your food diary, colored by", x: 484, y: 300, size: 34, bold: false, alpha: 0.72)
+  drawText(ctx, "how healthy each day was.", x: 484, y: 344, size: 34, bold: false, alpha: 0.72)
+  writePNG(ctx, to: storeGraphics.appendingPathComponent("play-feature-graphic.png"))
+}

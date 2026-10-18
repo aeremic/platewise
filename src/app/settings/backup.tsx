@@ -78,7 +78,13 @@ export default function BackupScreen() {
         'Replace',
       );
       if (!confirmed) return;
-      await importBackup(picked.backup);
+      try {
+        await importBackup(picked.backup);
+      } catch (error) {
+        // The import runs in one transaction, so a failure leaves the current data untouched.
+        console.warn(error);
+        throw new Error('The backup couldn’t be imported, so the data on this phone was kept as it was.');
+      }
       haptics.success();
       Alert.alert('Backup imported', `${plural(picked.summary.entries, 'logged food', 'logged foods')} and your goals are now on this phone.`);
     });
@@ -102,7 +108,8 @@ export default function BackupScreen() {
         <Text style={styles.body}>
           {Platform.OS === 'android'
             ? 'Saves all your categories, logged foods and goals to one file. Save it to a folder on this phone, or share it to Google Drive, email or your other phone. Works between Android and iPhone.'
-            : 'Saves all your categories, logged foods and goals to one file. Use “Save to Files” for iCloud Drive or this iPhone, or AirDrop it to your other phone. Works between iPhone and Android.'}
+            : // App Review 2.3.10: no other mobile platform names in the iOS app.
+              'Saves all your categories, logged foods and goals to one file. Use “Save to Files” for iCloud Drive or this iPhone, or AirDrop it to your other phone.'}
         </Text>
         {counts ? (
           <Text style={styles.meta}>
@@ -141,7 +148,14 @@ export default function BackupScreen() {
 }
 
 function describeSummary(summary: BackupSummary): string {
-  const platform = summary.platform === 'ios' ? 'iPhone' : summary.platform === 'android' ? 'Android' : summary.platform;
+  const platform =
+    summary.platform === 'ios'
+      ? 'iPhone'
+      : Platform.OS === 'ios'
+        ? 'another phone' // App Review 2.3.10: don't name other platforms on iOS
+        : summary.platform === 'android'
+          ? 'Android'
+          : summary.platform;
   const range =
     summary.firstDate && summary.lastDate
       ? `\nFoods from ${format(fromDateKey(summary.firstDate), 'MMM d, yyyy')} to ${format(fromDateKey(summary.lastDate), 'MMM d, yyyy')}`

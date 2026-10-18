@@ -6,13 +6,13 @@ import { Icon } from '@/components/Icon';
 import { LargeTitleScrollView } from '@/components/LargeTitleScrollView';
 import { listActiveCategories } from '@/data/categoriesRepo';
 import { getGoalsForDate } from '@/data/goalsRepo';
-import { todayKey } from '@/domain/dates';
 import { formatAmount, NUTRIENT_INFO, NUTRIENTS, type Goals } from '@/domain/nutrition';
 import { useLiveData } from '@/hooks/useLiveData';
+import { useTodayKey } from '@/hooks/useTodayKey';
 import { colors, spacing, type } from '@/theme';
 
 export default function SettingsScreen() {
-  const today = todayKey();
+  const today = useTodayKey();
   const { data: goals } = useLiveData(() => getGoalsForDate(today), ['daily_goals'], today);
   const { data: categories = [] } = useLiveData(listActiveCategories, ['categories'], 'active');
 
@@ -42,6 +42,20 @@ export default function SettingsScreen() {
           isLast
         />
       </Glass>
+
+      <Glass radius={22} style={styles.list}>
+        <Row
+          ios="info.circle"
+          android="info"
+          title="About"
+          subtitle="Privacy, support & health disclaimer"
+          onPress={() => router.push('/settings/about')}
+          isLast
+        />
+      </Glass>
+      <Text style={styles.footnote}>
+        Nutrition values and day colors are estimates, not medical advice.
+      </Text>
     </LargeTitleScrollView>
   );
 }
@@ -124,5 +138,11 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     fontSize: 13,
     marginTop: 2,
+  },
+  footnote: {
+    color: colors.textTertiary,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: -spacing.md,
   },
 });
