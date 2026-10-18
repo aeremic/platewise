@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,12 +19,16 @@ import { HEALTH_LABELS, HEALTH_LEVELS, type HealthLevel } from '@/domain/health'
 import { EMPTY_NUTRITION, type Nutrition } from '@/domain/nutrition';
 import { categoryEvents } from '@/lib/categoryEvents';
 import { FALLBACK_EMOJI, FOOD_EMOJIS } from '@/lib/emoji';
+import { useAndroidKeyboardInset } from '@/hooks/useAndroidKeyboardInset';
+import { useGuardedAction } from '@/hooks/useGuardedAction';
 import { haptics } from '@/lib/haptics';
-import { colors, healthColor, spacing, type, withAlpha } from '@/theme';
+import { colors, healthColor, spacing, textInputColors, type, withAlpha } from '@/theme';
 
 export default function CategoryEditorSheet() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  const keyboard = useAndroidKeyboardInset(scrollRef);
   const isNew = id === 'new';
   const numericId = Number(id);
 
@@ -37,6 +41,7 @@ export default function CategoryEditorSheet() {
   /** Where the current values came from, shown until the user edits them. */
   const [source, setSource] = useState<string>();
   const [error, setError] = useState<string>();
+  const nameRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (isNew) return;
@@ -51,29 +56,31 @@ export default function CategoryEditorSheet() {
     });
   }, [isNew, numericId]);
 
-  const save = async () => {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      setError('Give the category a name.');
-      return;
-    }
-    const duplicate = (await listActiveCategories()).some(
-      (c) => c.id !== existing?.id && c.name.toLowerCase() === trimmed.toLowerCase(),
-    );
-    if (duplicate) {
-      setError(`“${trimmed}” already exists.`);
-      return;
-    }
+  const { pending, run } = useGuardedAction();
+  const save = () =>
+    run(async () => {
+      const trimmed = name.trim();
+      if (!trimmed) {
+        setError('Give the category a name.');
+        return;
+      }
+      const duplicate = (await listActiveCategories()).some(
+        (c) => c.id !== existing?.id && c.name.toLowerCase() === trimmed.toLowerCase(),
+      );
+      if (duplicate) {
+        setError(`“${trimmed}” already exists.`);
+        return;
+      }
 
-    const input = { name: trimmed, emoji, health, portionLabel, ...nutrition };
-    if (existing) {
-      await updateCategory(existing.id, input);
-    } else {
-      categoryEvents.emitCreated(await createCategory(input));
-    }
-    haptics.success();
-    router.back();
-  };
+      const input = { name: trimmed, emoji, health, portionLabel, ...nutrition };
+      if (existing) {
+        await updateCategory(existing.id, input);
+      } else {
+        categoryEvents.emitCreated(await createCategory(input));
+      }
+      haptics.success();
+      router.back();
+    });
 
   const confirmRemove = () => {
     if (!existing) return;
@@ -85,11 +92,12 @@ export default function CategoryEditorSheet() {
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: async () => {
-            await removeCategory(existing.id);
-            haptics.warning();
-            router.back();
-          },
+          onPress: () =>
+            run(async () => {
+              await removeCategory(existing.id);
+              haptics.warning();
+              router.back();
+            }, 'The category was not removed. Please try again.'),
         },
       ],
     );
@@ -106,6 +114,7 @@ export default function CategoryEditorSheet() {
         <GlassButton
           accessibilityLabel="Save category"
           onPress={save}
+          disabled={pending}
           tint={colors.accent}
           contentStyle={styles.saveButton}>
           <Text style={styles.saveText}>Save</Text>
@@ -115,13 +124,17 @@ export default function CategoryEditorSheet() {
       {/* nestedScrollEnabled: without it Android dismisses the sheet on any downward drag
           instead of scrolling the content back up (see day.tsx). */}
       <ScrollView
+        ref={scrollRef}
+        onScroll={keyboard.onScroll}
+        scrollEventThrottle={16}
         nestedScrollEnabled
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl + keyboard.inset }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         automaticallyAdjustKeyboardInsets>
         <View style={styles.fields}>
           <TextInput
+            {...textInputColors}
             value={emoji}
             onChangeText={(text) => setEmoji(lastGrapheme(text))}
             placeholder={FALLBACK_EMOJI}
@@ -130,6 +143,8 @@ export default function CategoryEditorSheet() {
             accessibilityLabel="Emoji"
           />
           <TextInput
+            {...textInputColors}
+            ref={nameRef}
             value={name}
             onChangeText={(text) => {
               setName(text);
@@ -204,6 +219,7 @@ export default function CategoryEditorSheet() {
 
         <Text style={styles.label}>Nutrition per portion</Text>
         <TextInput
+          {...textInputColors}
           value={portionLabel}
           onChangeText={(text) => {
             setPortionLabel(text);
@@ -215,11 +231,15 @@ export default function CategoryEditorSheet() {
           maxLength={40}
           accessibilityLabel="Portion size"
         />
-        {/* Below the portion field: Ask AI asks about the portion typed above, Look up fills it in. */}
+        {/* Below the portion field: Ask AI asks about the portion typed above; Look up (when
+            enabled) fills it in. */}
         <NutritionLookup
           foodName={name}
           portionLabel={portionLabel}
-          onNeedName={() => setError('Enter the food’s name first, then look it up.')}
+          onNeedName={() => {
+            setError('Enter the food’s name first.');
+            nameRef.current?.focus();
+          }}
           onApply={(result) => {
             setPortionLabel(result.portionLabel);
             setNutrition(result.nutrition);

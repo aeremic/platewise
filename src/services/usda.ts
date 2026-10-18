@@ -4,11 +4,13 @@ import { roundAmount, type Nutrition } from '@/domain/nutrition';
  * USDA FoodData Central: free database of generic foods with nutrients per 100 g and
  * household portions. https://fdc.nal.usda.gov/api-guide
  *
- * Without a key the shared DEMO_KEY allows only ~10 lookups per hour; a free personal key
- * (https://api.data.gov/signup) can be set as EXPO_PUBLIC_FDC_API_KEY in .env.local.
+ * Only used when USDA_LOOKUP_ENABLED (src/config/app.ts) is on, which requires an api.data.gov
+ * key in EXPO_PUBLIC_FDC_API_KEY at build time.
  */
 const API_URL = 'https://api.nal.usda.gov/fdc/v1/foods/search';
-const API_KEY = process.env.EXPO_PUBLIC_FDC_API_KEY || 'DEMO_KEY';
+// Read the key only behind the flag: Expo inlines EXPO_PUBLIC_* values at build time, so an
+// unguarded read would put a key from .env.local into the bundle even with Look up off.
+const API_KEY = process.env.EXPO_PUBLIC_USDA_LOOKUP === 'enabled' ? (process.env.EXPO_PUBLIC_FDC_API_KEY ?? '') : '';
 
 // Generic-food datasets; "Branded" (packaged products) is excluded on purpose.
 const DATA_TYPES = ['Survey (FNDDS)', 'SR Legacy', 'Foundation'];

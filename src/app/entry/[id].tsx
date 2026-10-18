@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassButton, IconButton } from '@/components/glass/GlassButton';
@@ -15,6 +15,8 @@ import { getGoalsForDate } from '@/data/goalsRepo';
 import { rateDay } from '@/domain/dayRating';
 import { fromDateKey } from '@/domain/dates';
 import { NUTRIENTS } from '@/domain/nutrition';
+import { useAndroidKeyboardInset } from '@/hooks/useAndroidKeyboardInset';
+import { useGuardedAction } from '@/hooks/useGuardedAction';
 import { useLiveData } from '@/hooks/useLiveData';
 import { categoryEmoji } from '@/lib/emoji';
 import { haptics } from '@/lib/haptics';
@@ -24,6 +26,8 @@ import { colors, spacing, type } from '@/theme';
 export default function EntryEditorSheet() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  const keyboard = useAndroidKeyboardInset(scrollRef);
 
   const [entry, setEntry] = useState<EntryWithCategory>();
   const [amount, setAmount] = useState<Amount>();
@@ -61,12 +65,14 @@ export default function EntryEditorSheet() {
         )
       : null;
 
-  const save = async () => {
-    if (!entry || !amount) return;
-    await updateEntry(entry.id, amount);
-    haptics.success();
-    router.back();
-  };
+  const { pending, run } = useGuardedAction();
+  const save = () =>
+    run(async () => {
+      if (!entry || !amount) return;
+      await updateEntry(entry.id, amount);
+      haptics.success();
+      router.back();
+    });
 
   const confirmRemove = () => {
     if (!entry) return;
@@ -75,18 +81,21 @@ export default function EntryEditorSheet() {
       {
         text: 'Remove',
         style: 'destructive',
-        onPress: async () => {
-          await deleteEntry(entry.id);
-          haptics.warning();
-          router.back();
-        },
+        onPress: () =>
+          run(async () => {
+            await deleteEntry(entry.id);
+            haptics.warning();
+            router.back();
+          }, 'The food was not removed. Please try again.'),
       },
     ]);
   };
 
   return (
-    <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.xl }]}>
-      <View style={styles.topBar}>
+    <View style={styles.sheet}>
+      {/* Form sheet layout: [header, ScrollView] — the header must not be flattened (iOS) and
+          the ScrollView needs nestedScrollEnabled (Android); see AGENTS.md. */}
+      <View style={styles.topBar} collapsable={false}>
         <IconButton size={40} accessibilityLabel="Close" onPress={() => router.back()}>
           <Icon ios="xmark" android="close" size={16} />
         </IconButton>
@@ -94,63 +103,79 @@ export default function EntryEditorSheet() {
         <GlassButton
           accessibilityLabel="Save changes"
           onPress={save}
-          disabled={!amount}
+          disabled={!amount || pending}
           tint={colors.accent}
           contentStyle={styles.saveButton}>
           <Text style={styles.saveText}>Save</Text>
         </GlassButton>
       </View>
 
-      {entry && amount ? (
-        <>
-          <View style={styles.food}>
-            <Text style={styles.emoji}>{categoryEmoji(entry.emoji)}</Text>
-            <View style={styles.foodText}>
-              <Text style={styles.name} numberOfLines={1}>
-                {entry.name}
-              </Text>
-              <Text style={styles.meta} numberOfLines={1}>
-                {format(fromDateKey(entry.date), 'EEEE, MMMM d')}
-              </Text>
-              {entry.portionLabel ? (
-                <Text style={styles.meta} numberOfLines={1}>
-                  1× = {entry.portionLabel}
+      <ScrollView
+        ref={scrollRef}
+        onScroll={keyboard.onScroll}
+        scrollEventThrottle={16}
+        nestedScrollEnabled
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl + keyboard.inset }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets>
+        {entry && amount ? (
+          <>
+            <View style={styles.food}>
+              <Text style={styles.emoji}>{categoryEmoji(entry.emoji)}</Text>
+              <View style={styles.foodText}>
+                <Text style={styles.name} numberOfLines={1}>
+                  {entry.name}
                 </Text>
-              ) : null}
+                <Text style={styles.meta} numberOfLines={1}>
+                  {format(fromDateKey(entry.date), 'EEEE, MMMM d')}
+                </Text>
+                {entry.portionLabel ? (
+                  <Text style={styles.meta} numberOfLines={1}>
+                    1× = {entry.portionLabel}
+                  </Text>
+                ) : null}
+              </View>
+              <PortionStepper portions={amount.portions} onChange={(portions) => setAmount(withPortions(amount, portions))} />
             </View>
-            <PortionStepper portions={amount.portions} onChange={(portions) => setAmount(withPortions(amount, portions))} />
-          </View>
 
-          <Text style={styles.label}>What you ate</Text>
-          <NutritionFields value={amount.nutrition} onChange={(nutrition) => setAmount({ ...amount, nutrition })} />
-          <Text style={styles.hint}>
-            Changing portions scales these values. They stay as saved even if you edit the category later.
-          </Text>
+            <Text style={styles.label}>What you ate</Text>
+            <NutritionFields value={amount.nutrition} onChange={(nutrition) => setAmount({ ...amount, nutrition })} />
+            <Text style={styles.hint}>
+              Changing portions scales these values. They stay as saved even if you edit the category later.
+            </Text>
 
-          {rating && dayGoals ? (
-            <DayPreview rating={rating} goals={dayGoals} unsavedLabel={changed ? 'includes unsaved changes' : null} />
-          ) : null}
+            {rating && dayGoals ? (
+              <DayPreview rating={rating} goals={dayGoals} unsavedLabel={changed ? 'includes unsaved changes' : null} />
+            ) : null}
 
-          <Pressable accessibilityRole="button" onPress={confirmRemove} style={styles.remove} hitSlop={8}>
-            <Icon ios="trash" android="delete" size={16} color={colors.destructive} />
-            <Text style={styles.removeText}>Remove from this day</Text>
-          </Pressable>
-        </>
-      ) : null}
+            <Pressable accessibilityRole="button" onPress={confirmRemove} style={styles.remove} hitSlop={8}>
+              <Icon ios="trash" android="delete" size={16} color={colors.destructive} />
+              <Text style={styles.removeText}>Remove from this day</Text>
+            </Pressable>
+          </>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   sheet: {
-    paddingTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
+    flex: 1,
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  content: {
+    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
   },
   title: {
     ...type.headline,

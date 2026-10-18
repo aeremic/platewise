@@ -1,3 +1,5 @@
+import { isValid, parseISO } from 'date-fns';
+
 import type { HealthLevel } from './health';
 
 /**
@@ -11,6 +13,8 @@ import type { HealthLevel } from './health';
 
 export const BACKUP_APP = 'platewise';
 export const BACKUP_FORMAT_VERSION = 1;
+/** Far above any real diary (~100,000 entries); stops a wrong pick from loading a huge file. */
+export const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
 
 export type BackupCategory = {
   id: number;
@@ -129,6 +133,15 @@ export function parseBackup(text: string, currentSchemaVersion: number): ParseRe
     assertUniqueIds(categories, 'categories');
     assertUniqueIds(entries, 'entries');
     assertUniqueIds(dailyGoals, 'dailyGoals');
+    // Built-ins are unique per seed key in the database; a repeat would fail halfway into the import.
+    const seedKeys = new Set<string>();
+    categories.forEach((category, i) => {
+      if (category.seedKey == null) return;
+      if (seedKeys.has(category.seedKey)) {
+        throw new InvalidBackup(`The backup is damaged: categories[${i}] repeats a built-in category.`);
+      }
+      seedKeys.add(category.seedKey);
+    });
     const categoryIds = new Set(categories.map((c) => c.id));
     entries.forEach((entry, i) => {
       if (!categoryIds.has(entry.categoryId)) {
@@ -143,11 +156,14 @@ export function parseBackup(text: string, currentSchemaVersion: number): ParseRe
       goalDates.add(goal.effectiveFrom);
     });
 
+    const exportedAt = str(root.exportedAt, 'exportedAt');
+    if (!isValid(parseISO(exportedAt))) throw damaged('exportedAt');
+
     const backup: BackupFile = {
       app: BACKUP_APP,
       formatVersion,
       schemaVersion,
-      exportedAt: str(root.exportedAt, 'exportedAt'),
+      exportedAt,
       platform: typeof root.platform === 'string' ? root.platform : 'unknown',
       appVersion: typeof root.appVersion === 'string' ? root.appVersion : null,
       data: { categories, entries, dailyGoals },

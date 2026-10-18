@@ -21,7 +21,7 @@ const CHUNK = 200;
 
 /**
  * Replaces all diary data with `data` in one transaction: either everything is imported or
- * nothing changes. Ids are kept so entries keep pointing at their categories. Built-in
+ * nothing changes (it only throws in the second case). Ids are kept so entries keep pointing at their categories. Built-in
  * categories this app version knows about but the backup lacks are added afterwards.
  */
 export async function replaceAllData(data: BackupData): Promise<void> {
@@ -40,5 +40,7 @@ export async function replaceAllData(data: BackupData): Promise<void> {
       tx.insert(dailyGoals).values(data.dailyGoals.slice(i, i + CHUNK)).run();
     }
   });
-  await seedDefaultCategories();
+  // Best effort: startup seeds again, and a failure here must not look like a failed import
+  // (callers rely on a throw meaning nothing changed).
+  await seedDefaultCategories().catch((error) => console.warn(error));
 }

@@ -8,6 +8,7 @@ import { Platform } from 'react-native';
 import { readAllData, replaceAllData } from '@/data/backupRepo';
 import {
   createBackup,
+  MAX_BACKUP_BYTES,
   parseBackup,
   summarizeBackup,
   type BackupFile,
@@ -95,6 +96,9 @@ export async function pickBackup(): Promise<PickedBackup> {
   if (result.canceled) return { status: 'canceled' };
 
   const asset = result.assets[0];
+  if (asset.size != null && asset.size > MAX_BACKUP_BYTES) {
+    return { status: 'invalid', error: 'This file is too large to be a Platewise backup.' };
+  }
   let text: string;
   try {
     text = await new File(asset.uri).text();
@@ -107,10 +111,12 @@ export async function pickBackup(): Promise<PickedBackup> {
     : { status: 'invalid', error: parsed.error };
 }
 
-/** Replaces all data with the backup, after saving the current data so it can be undone. */
+/** Replaces all data with the backup and keeps the previous data so the import can be undone. */
 export async function importBackup(backup: BackupFile): Promise<void> {
-  writeText(undoFile(), JSON.stringify(await currentBackup()));
+  const previous = JSON.stringify(await currentBackup());
+  // One transaction: if it fails nothing changed, and the undo file of an earlier import stays.
   await replaceAllData(backup.data);
+  writeText(undoFile(), previous);
 }
 
 export function undoAvailableSince(): string | null {

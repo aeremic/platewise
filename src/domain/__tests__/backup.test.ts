@@ -130,5 +130,12 @@ describe('rejected files', () => {
     expect(errorFor(withData({ categories: [{ ...data.categories[0], health: 3 as 0 }] }))).toMatch(/categories\[0\]\.health/);
     expect(errorFor(withData({ categories: [data.categories[0], { ...data.categories[1], id: 1 }] }))).toMatch(/duplicate id 1/);
     expect(errorFor(withData({ entries: [{ ...data.entries[0], portions: 0 }] }))).toMatch(/portions/);
+    expect(errorFor(withData({ categories: [data.categories[0], { ...data.categories[1], seedKey: 'pizza' }] }))).toMatch(
+      /categories\[1\] repeats a built-in category/,
+    );
+  });
+
+  it('rejects an unreadable export date (it is shown before importing)', () => {
+    expect(errorFor(serialize(createBackup(data, { ...meta, exportedAt: 'yesterday' })))).toMatch(/exportedAt/);
   });
 });

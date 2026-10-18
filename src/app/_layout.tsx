@@ -1,11 +1,12 @@
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
-import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, Stack, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { ErrorScreen } from '@/components/ErrorScreen';
 import { hasNativeGlass } from '@/components/glass/Glass';
 import { seedDefaultCategories } from '@/data/categoriesRepo';
 import { db } from '@/db/client';
@@ -35,6 +36,18 @@ const navigationTheme = {
 // On iOS 26 a transparent sheet gets the system Liquid Glass background.
 const sheetBackground = hasNativeGlass ? 'transparent' : colors.sheetBackground;
 
+/** Any unexpected render error: a calm screen with retry instead of a crash. */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <ErrorScreen
+      title="Something went wrong"
+      message="This screen ran into a problem. Your logged food is saved on this phone."
+      error={error}
+      onRetry={() => void retry()}
+    />
+  );
+}
+
 export default function RootLayout() {
   const migration = useMigrations(db, migrations);
   const [seeded, setSeeded] = useState(false);
@@ -52,10 +65,11 @@ export default function RootLayout() {
 
   if (error) {
     return (
-      <View style={styles.error}>
-        <Text style={styles.errorTitle}>Couldn’t open your food diary</Text>
-        <Text style={styles.errorText}>{error.message}</Text>
-      </View>
+      <ErrorScreen
+        title="Couldn’t open your food diary"
+        message="Please close and reopen the app, or check for an update. If it keeps happening, contact support."
+        error={error}
+      />
     );
   }
   if (!seeded) return null;
@@ -106,7 +120,7 @@ export default function RootLayout() {
             name="entry/[id]"
             options={{
               presentation: 'formSheet',
-              sheetAllowedDetents: 'fitToContents',
+              sheetAllowedDetents: [1],
               sheetGrabberVisible: true,
               sheetCornerRadius: 32,
               contentStyle: { backgroundColor: sheetBackground },
@@ -137,10 +151,22 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
+            name="settings/about"
+            options={{
+              headerShown: true,
+              title: 'About',
+              headerLargeTitle: Platform.OS === 'ios',
+              headerTransparent: Platform.OS === 'ios',
+              headerTintColor: colors.text,
+              headerStyle: Platform.OS === 'ios' ? undefined : { backgroundColor: colors.background },
+              headerBackButtonDisplayMode: 'minimal',
+            }}
+          />
+          <Stack.Screen
             name="settings/goals"
             options={{
               presentation: 'formSheet',
-              sheetAllowedDetents: 'fitToContents',
+              sheetAllowedDetents: [1],
               sheetGrabberVisible: true,
               sheetCornerRadius: 32,
               contentStyle: { backgroundColor: sheetBackground },
@@ -156,21 +182,5 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  error: {
-    flex: 1,
-    backgroundColor: colors.background,
-    justifyContent: 'center',
-    padding: 32,
-    gap: 8,
-  },
-  errorTitle: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  errorText: {
-    color: colors.textSecondary,
-    fontSize: 15,
   },
 });

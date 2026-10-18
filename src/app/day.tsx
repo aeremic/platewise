@@ -16,14 +16,17 @@ import { getCategory, listActiveCategories, listRecentCategories } from '@/data/
 import { getGoalsForDate } from '@/data/goalsRepo';
 import { addEntries, getDaySummaries, getEntriesForDate } from '@/data/entriesRepo';
 import type { Category } from '@/db/schema';
-import { fromDateKey, gridRange, isDateKey, todayKey, toDateKey, type DateKey } from '@/domain/dates';
+import { fromDateKey, gridRange, isDateKey, toDateKey, type DateKey } from '@/domain/dates';
 import { rateDay } from '@/domain/dayRating';
 import { HEALTH_LABELS, HEALTH_LEVELS } from '@/domain/health';
 import { formatPortions } from '@/domain/nutrition';
+import { useAndroidKeyboardInset } from '@/hooks/useAndroidKeyboardInset';
+import { useGuardedAction } from '@/hooks/useGuardedAction';
 import { useLiveData } from '@/hooks/useLiveData';
+import { useTodayKey } from '@/hooks/useTodayKey';
 import { categoryEvents } from '@/lib/categoryEvents';
 import { haptics } from '@/lib/haptics';
-import { colors, healthColor, spacing, type } from '@/theme';
+import { colors, healthColor, spacing, textInputColors, type } from '@/theme';
 
 type Draft = Amount & { category: Category };
 
@@ -40,7 +43,8 @@ export default function DaySheet() {
   const params = useLocalSearchParams<{ date?: string }>();
   const insets = useSafeAreaInsets();
 
-  const [date, setDate] = useState<DateKey>(() => (isDateKey(params.date) ? params.date : todayKey()));
+  const today = useTodayKey();
+  const [date, setDate] = useState<DateKey>(() => (isDateKey(params.date) ? params.date : today));
   const [pickerMonth, setPickerMonth] = useState<Date | null>(null);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [query, setQuery] = useState('');
@@ -57,6 +61,7 @@ export default function DaySheet() {
   // back to the very top if the card is visible from there, otherwise just far enough that the
   // card sits at the top. Runs from the card's first layout, once its final position is known.
   const scrollRef = useRef<ScrollView>(null);
+  const keyboard = useAndroidKeyboardInset(scrollRef);
   const contentRef = useRef<View>(null);
   const viewportHeight = useRef(0);
   const cardRefs = useRef(new Map<number, View>());
@@ -106,7 +111,7 @@ export default function DaySheet() {
   const rating = dayGoals ? rateDay(previewFoods, dayGoals) : null;
   const dayLevel = rating?.level ?? null;
   const day = fromDateKey(date);
-  const isToday = date === todayKey();
+  const isToday = date === today;
 
   const normalizedQuery = query.trim().toLowerCase();
   const visibleCategories = normalizedQuery
@@ -133,15 +138,17 @@ export default function DaySheet() {
   const updateDraft = (categoryId: number, amount: Amount) =>
     setDrafts((ds) => ds.map((d) => (d.category.id === categoryId ? { ...d, ...amount } : d)));
 
-  const save = async () => {
-    if (drafts.length === 0) return;
-    await addEntries(
-      date,
-      drafts.map((d) => ({ categoryId: d.category.id, portions: d.portions, nutrition: d.nutrition })),
-    );
-    haptics.success();
-    router.back();
-  };
+  const { pending, run } = useGuardedAction();
+  const save = () =>
+    run(async () => {
+      if (drafts.length === 0) return;
+      await addEntries(
+        date,
+        drafts.map((d) => ({ categoryId: d.category.id, portions: d.portions, nutrition: d.nutrition })),
+      );
+      haptics.success();
+      router.back();
+    });
 
   const count = drafts.length;
 
@@ -156,7 +163,7 @@ export default function DaySheet() {
         <GlassButton
           accessibilityLabel={count > 0 ? `Save ${count} ${count === 1 ? 'item' : 'items'}` : 'Save'}
           onPress={save}
-          disabled={count === 0}
+          disabled={count === 0 || pending}
           tint={count > 0 ? colors.accent : undefined}
           contentStyle={[styles.saveButton, count === 0 && styles.saveDisabled]}>
           <Text style={styles.saveText}>{count > 0 ? `Save ${count}` : 'Save'}</Text>
@@ -173,8 +180,10 @@ export default function DaySheet() {
         onLayout={(e: LayoutChangeEvent) => {
           viewportHeight.current = e.nativeEvent.layout.height;
         }}
+        onScroll={keyboard.onScroll}
+        scrollEventThrottle={16}
         nestedScrollEnabled
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl + keyboard.inset }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag">
         {/* Date navigation */}
@@ -229,6 +238,7 @@ export default function DaySheet() {
               <MonthGrid
                 compact
                 month={pickerMonth}
+                today={today}
                 summaries={pickerSummaries}
                 selectedKey={date}
                 onSelectDay={changeDate}
@@ -259,7 +269,7 @@ export default function DaySheet() {
                   emoji={entry.emoji}
                   health={entry.health}
                   detail={entry.portions !== 1 ? `${formatPortions(entry.portions)}×` : undefined}
-                  accessibilityLabel={`Edit ${entry.name}`}
+                  accessibilityLabel={`Edit ${entry.name}, ${formatPortions(entry.portions)} ${entry.portions === 1 ? 'portion' : 'portions'}`}
                   onPress={() => router.push({ pathname: '/entry/[id]', params: { id: String(entry.id) } })}
                 />
               ))}
@@ -351,6 +361,7 @@ export default function DaySheet() {
           <View style={styles.search}>
             <Icon ios="magnifyingglass" android="search" size={16} color={colors.textTertiary} />
             <TextInput
+              {...textInputColors}
               value={query}
               onChangeText={setQuery}
               placeholder="Search categories"
